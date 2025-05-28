@@ -16,7 +16,7 @@ ssh_key = {
 }
 
 network_settings = {
-  name = "brusia-bucket"
+  name = "brusia-network"
   subnet_name = "brusia-subnet"
   subnet_range = "10.0.0.0/24"
   nat_gateway_name = "brusia-nat-gateway"

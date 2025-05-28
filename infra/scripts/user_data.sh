@@ -147,6 +147,8 @@ if [ $${#TARGET_BUCKET_OBJECTS[@]} -eq 0 ]; then
     done
 else
     log "Target bucket already contains objects."
+    log "Listing contents of $TARGET_BUCKET"
+    log "$${TARGET_BUCKET_OBJECTS[@]}"
 fi
 
 
