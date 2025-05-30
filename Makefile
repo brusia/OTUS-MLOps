@@ -27,3 +27,6 @@ restart_proxy:
 	terraform validate && \
 	terraform plan && \
 	terraform apply -auto-approve
+
+compute: create_hadoop
+	cd infra && terraform destroy -target=module.dataproc -auto-approve

@@ -10,21 +10,21 @@ function log() {
 # Функция для копирования заданного файла в целевой бакет
 function copy_file() {
     FILE_NAME=$1
-    SOURCE_BUCKET=$2
-    TARGET_BUCKET=$3
+    SOURCE=$2
+    TARGET=$3
     USER_NAME=$4
     s3cmd cp \
         --config=/home/$USER_NAME/.s3cfg \
         --acl-public \
-        s3://$SOURCE_BUCKET/$FILE_NAME \
-        s3://$TARGET_BUCKET/$FILE_NAME
+        s3://$SOURCE/$FILE_NAME \
+        s3://$TARGET/$FILE_NAME
 
     # Проверяем успешность копирования
     if [ $? -eq 0 ]; then
-        log "Listing contents of $TARGET_BUCKET"
-        s3cmd ls --config=/home/$USER_NAME/.s3cfg s3://$TARGET_BUCKET/
+        log "Listing contents of $TARGET"
+        s3cmd ls --config=/home/$USER_NAME/.s3cfg s3://$TARGET/
     else
-        log "Error occurred while copying file "$FILE_NAME" to "$TARGET_BUCKET
+        log "Error occurred while copying file "$FILE_NAME" to "$TARGET
     fi
 }
 
@@ -137,18 +137,19 @@ SOURCE_BUCKET=otus-mlops-source-data
 # На данный момент копирование происходит только в случае, если TARGET_BUCKET не содержит объектов.
 # В дальнейшем имеет смысл проверять консистентность данных на SOURCE_BUCKET и TARGET_BUCKET (возможно, SOURCE_BUCKET будет обновляться и туда будут добавляться новые файлы или обновляться существующие)
 # В этом случае нужно копировать только новые/изменённые данные
-mapfile -t TARGET_BUCKET_OBJECTS < <(s3cmd ls --config=$${HOME}/.s3cfg s3://$${TARGET_BUCKET} | awk '{print $4}')
+mapfile -t TARGET_BUCKET_OBJECTS < <(s3cmd ls --config=$${HOME}/.s3cfg "s3://$${TARGET_BUCKET}/data/raw/"| awk '{print $4}')
 
 if [ $${#TARGET_BUCKET_OBJECTS[@]} -eq 0 ]; then
     log "There are no objects in target bucket. Copy data from source bucket to destination bucket"
     mapfile -t FILE_NAMES < <(s3cmd ls --config=$${HOME}/.s3cfg s3://$${SOURCE_BUCKET} | awk '{print $4}' | sed "s#s3://$${SOURCE_BUCKET}/##")
     for file_name in $${FILE_NAMES[@]}; do
-        copy_file $${file_name} $${SOURCE_BUCKET} $${TARGET_BUCKET} ${user_name}
+        copy_file $${file_name} $${SOURCE_BUCKET} $${TARGET_BUCKET}/data/raw/ ${user_name}
     done
 else
     log "Target bucket already contains objects."
-    log "Listing contents of $TARGET_BUCKET"
-    log "$${TARGET_BUCKET_OBJECTS[@]}"
+    log "Listing contents of $${TARGET_BUCKET}/data/raw/"
+    log "Objects count: $${#TARGET_BUCKET_OBJECTS[@]}"
+    printf '%s\n' "$${TARGET_BUCKET_OBJECTS[@]}"
 fi
 
 
@@ -161,7 +162,7 @@ log "Copying upload_data_to_hdfs.sh script to proxy machine"
 cat > $HOME/scripts/upload_data_to_hdfs.sh << 'EOL'
 ${upload_data_to_hdfs_content}
 EOL
-sed -i 's/{{ s3_bucket }}/'$TARGET_BUCKET'/g' $HOME/scripts/upload_data_to_hdfs.sh
+sed -i 's/{{ s3_bucket }}/'$TARGET_BUCKET'\/data\/raw/g' $HOME/scripts/upload_data_to_hdfs.sh
 
 # Устанавливаем правильные разрешения для скрипта на прокси-машине
 log "Setting permissions for upload_data_to_hdfs.sh on proxy machine"
@@ -203,6 +204,12 @@ ssh -i $HOME/.ssh/dataproc_key -o StrictHostKeyChecking=no ubuntu@$DATAPROC_MAST
 
 log "upload_data_to_hdfs script results"
 cat $HOME/logs/dataproc_master_execution.log
+
+log "Upload results to storage bucket"
+current_time=$( date +'%Y-%m-%d_%H-%M-%S')
+s3cmd put --config=/home/${user_name}/.s3cfg --acl-public \
+    $HOME/logs/dataproc_master_execution.log \
+    s3://$TARGET_BUCKET/logs/$${current_time}_dataproc_master_execution.log
 
 # Изменяем владельца лог-файла
 log "Changing ownership of log file"

@@ -27,7 +27,7 @@ if [ -n "$FILE_NAME" ]; then
 else
     # Копируем все данные
     log "Copying all data from S3 to HDFS"
-    hadoop distcp s3a://{{ s3_bucket }}/ /user/ubuntu/data
+    hadoop distcp s3a://{{ s3_bucket }}/* /user/ubuntu/data
 fi
 
 # Выводим содержимое директории для проверки
