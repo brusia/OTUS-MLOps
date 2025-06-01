@@ -56,6 +56,13 @@ variable "storage_secrets" {
     })
 }
 
+variable "git" {
+  type = object({
+    repo = string
+    token = string
+  })
+}
+
 variable "dataproc" {
       type = object({
         # instance_name = string

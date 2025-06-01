@@ -101,11 +101,20 @@ variable "dataproc_settings" {
             hosts_count = number
             })
 
-        # compute_resources = object({
-        #     resource_preset_id = string
-        #     disk_type_id       = string
-        #     disk_size          = number
-        #     hosts_count = number
-        #     })
+        compute_resources = object({
+            resource_preset_id = string
+            disk_type_id       = string
+            disk_size          = number
+            hosts_count = number
+            })
     })
 }
+
+variable "git" {
+  type = object({
+    repo = string
+    branch = string
+    token = string
+  })
+}
+

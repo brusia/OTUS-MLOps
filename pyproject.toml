@@ -1,0 +1,18 @@
+[project]
+name = "otus-mlops"
+version = "0.1.0"
+description = "MLOps Otus Repo For Hometasks"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+data-analyse = [
+    "evidently>=0.7.6",
+]
+dev = [
+    "black>=25.1.0",
+    "mypy>=1.16.0",
+    "pandas-stubs>=2.2.3.250527",
+    "pre-commit>=4.2.0",
+]

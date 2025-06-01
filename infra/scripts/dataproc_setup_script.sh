@@ -23,21 +23,27 @@ hdfs dfs -mkdir -p /user/ubuntu/data
 if [ -n "$FILE_NAME" ]; then
     # Копируем конкретный файл
     log "Copying specific file from S3 to HDFS"
-    hadoop distcp s3a://{{ s3_bucket }}/$FILE_NAME /user/ubuntu/data/$FILE_NAME
+    hadoop distcp "s3a://\{\{ s3_bucket \}\}/$FILE_NAME" "/user/ubuntu/data/$FILE_NAME"
 else
     # Копируем все данные
     log "Copying all data from S3 to HDFS"
-    hadoop distcp s3a://{{ s3_bucket }}/* /user/ubuntu/data
+    # hadoop distcp "s3a://\{\{ s3_bucket \}\}/*" /user/ubuntu/data
 fi
 
 # Выводим содержимое директории для проверки
 log "Listing files in HDFS directory"
-hdfs dfs -ls /user/ubuntu/data
 
 # Проверяем успешность выполнения операции
-if [ $? -eq 0 ]; then
+if hdfs dfs -ls /user/ubuntu/data
+then
     log "Data was successfully copied to HDFS"
 else
     log "Failed to copy data to HDFS"
     exit 1
 fi
+
+cd /user/ubuntu/repo
+python3 -m pip install uv
+python3 -m uv sync
+python3 -m uv run src/otus-mlops/scripts/analyse_data.py
+
