@@ -144,17 +144,17 @@ resource "yandex_dataproc_cluster" "dataproc_cluster" {
       hosts_count = var.dataproc.data_resources.hosts_count
     }
 
-    # subcluster_spec {
-    #   name = "compute"
-    #   role = "COMPUTENODE"
-    #   resources {
-    #     resource_preset_id = var.dataproc_compute_resources.resource_preset_id
-    #     disk_type_id       = "network-ssd"
-    #     disk_size          = var.dataproc_compute_resources.disk_size
-    #   }
-    #   subnet_id   = module.network.subnet_id
-    #   hosts_count = 1
-    # }
+    subcluster_spec {
+      name = "compute"
+      role = "COMPUTENODE"
+      resources {
+        resource_preset_id = var.dataproc.compute_resources.resource_preset_id
+        disk_type_id       = var.dataproc.compute_resources.disk_type_id
+        disk_size          = var.dataproc.compute_resources.disk_size
+      }
+      subnet_id   = module.network.subnet_id
+      hosts_count = var.dataproc.compute_resources.hosts_count
+    }
   }
 }
 
@@ -189,6 +189,7 @@ resource "yandex_compute_instance" "proxy" {
       dataproc_init_content = file("${path.root}/scripts/dataproc_setup_script.sh")
       # git_user                    = var.git_user
       git_repo                    = var.git.repo
+      git_branch = var.git.branch
       git_token                   = var.git.token
     })
   }

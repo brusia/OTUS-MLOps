@@ -7,16 +7,16 @@ from evidently.ui.workspace import RemoteWorkspace  # type: ignore[import-not-fo
 from evidently import DataDefinition, Dataset, Report  # type: ignore[import-not-found]
 from evidently.presets import DataSummaryPreset  # type: ignore[import-not-found]
 
-from internals.interfaces.i_data_analyser import REPORT_PATH, IDataAnalyser
+from otus_mlops.internals.interfaces.i_data_analyser import REPORT_PATH, IDataAnalyser
 
-from evidently.metrics import (
-    DatasetSummaryMetric,
-    DataQualityPreset,
-    ColumnDriftMetric,
-    ColumnDistributionMetric,
-    ColumnQuantileMetric,
-    ColumnValueRangeMetric
-)
+# from evidently.metrics import (
+#     DatasetSummaryMetric,
+#     DataQualityPreset,
+#     ColumnDriftMetric,
+#     ColumnDistributionMetric,
+#     ColumnQuantileMetric,
+#     ColumnValueRangeMetric
+# )
 
 # import pandas as pd
 

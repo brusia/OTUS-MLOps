@@ -2,3 +2,8 @@ terraform.tfvars
 *terraform.tfstate*
 .terraform
 .terraform.lock.hcl
+dist
+*.egg-info
+__pycache__
+.vscode
+.venv

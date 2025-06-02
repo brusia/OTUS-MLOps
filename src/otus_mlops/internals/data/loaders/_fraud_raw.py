@@ -4,34 +4,32 @@ from pathlib import Path
 from typing import Final, Iterator, override
 
 import pandas as pd
-from interfaces.i_data_loader import CSV_EXTENSION, IDataLoader
+from otus_mlops.internals.interfaces.i_data_loader import CSV_EXTENSION, IDataLoader, LoadingMethod
 
 DEFAULT_DATA_DIR: Final[Path] = Path("/home/ubuntu/data")
 
 
-class LoadingMethod(StrEnum):
-    FullDataset = auto()
-    OneByOne = auto()
-
-
 class FraudRawDataLoader(IDataLoader):
     def __init__(self):
-        super.__init__(self)
+        pass
+        # super.__init__(self)
 
     @override
-    def load(self, data_dir: str | Path = "", loading_method: LoadingMethod = LoadingMethod.OneByOne) -> pd.DataFrame | Iterator[pd.DataFrame]:
+    def load(self, data_dir: str | Path = "", loading_method: LoadingMethod = LoadingMethod.OneByOne) -> pd.DataFrame:
         # data_path: Path
         # if data_dir and isinstance(str, data_dir):
-        data_path: Path = Path(data_dir) if isinstance(str, data_dir) and data_dir else data_dir
+        data_path: Path = Path(data_dir) if isinstance(data_dir, str) and data_dir != "" else data_dir if isinstance(data_dir, Path) and data_dir.exists() else DEFAULT_DATA_DIR
 
-        if not data_path.exists():
-            data_path = DEFAULT_DATA_DIR
+        # if not data_path.exists():
+        #     data_path = DEFAULT_DATA_DIR
 
         match loading_method:
             case LoadingMethod.FullDataset:
                 return self._load_full(data_path)
             case LoadingMethod.OneByOne:
                 return self._load_one_by_one(data_path)
+            # case _:
+            #     return pd.DataFrame()
 
 
     def _load_full(self, data_path: Path) -> pd.DataFrame:

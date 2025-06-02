@@ -159,10 +159,11 @@ mkdir -p $HOME/scripts
 
 # Копируем скрипт dataproc_setup_script.sh на прокси-машину
 log "Copying dataproc_setup_script.sh script to proxy machine"
-cat > $HOME/scripts/dataproc.sh << 'EOL'
+cat > $HOME/scripts/dataproc_setup_script.sh << 'EOL'
 ${dataproc_init_content}
 EOL
 sed -i 's/{{ s3_bucket }}/'$TARGET_BUCKET'\/data\/raw/g' $HOME/scripts/dataproc.sh
+sed -i 's/{{ git_repo }}/'${git_repo}'/g' $HOME/scripts/dataproc.sh
 
 # Устанавливаем правильные разрешения для скрипта на прокси-машине
 log "Setting permissions for dataproc_setup_script.sh on proxy machine"
@@ -196,13 +197,6 @@ fi
 # Устанавливаем правильные разрешения для скрипта на мастер-ноде
 log "Setting permissions for dataproc_setup_script.sh on master node"
 ssh -i $HOME/.ssh/dataproc_key -o StrictHostKeyChecking=no $DATAPROC_HOST "chmod +x $${HOME}/scripts/dataproc_setup_script.sh"
-
-# Временное решение. В дальнейшем в локальной сети dataproc-кластера будет развёрнут артефакторий. Из артефактория dataproc кластер будет устанавливать python-пакет (либо deb). Пока не реализовано, копирует репозиторий на proxy-машину, оттуда на dataproc, где и производим все вычисления.
-# Клонируем репозиторий github на proxy-машину
-mkdir $HOME/repo
-cd $HOME/repo
-git clone ${git_repo}
-git checkout ${git_branch}
 
 # Копируем репо на proxy-машину
 rsync -a $HOME/scripts/repo $DATAPROC_HOST:$HOME/repo/otus-mlops

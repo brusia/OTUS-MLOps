@@ -1,5 +1,5 @@
 from pathlib import Path
-from internals.interfaces.i_data_analyser import REPORT_PATH, IDataAnalyser
+from otus_mlops.internals.interfaces.i_data_analyser import REPORT_PATH, IDataAnalyser
 
 class TFDataAnalyser(IDataAnalyser):
     def __init__(self, report_dir: str = ""):

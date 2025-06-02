@@ -1,5 +1,3 @@
-<!-- To be moved here after applying. -->
-
 # Задание 2
 
 В рамках задания 2 курса разработан terraform-скрипт для создания Yandex Storage, Data Proc кластера и соответствующей инфраструктуры.

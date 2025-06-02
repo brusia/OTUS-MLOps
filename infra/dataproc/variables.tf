@@ -59,6 +59,7 @@ variable "storage_secrets" {
 variable "git" {
   type = object({
     repo = string
+    branch = string
     token = string
   })
 }
@@ -79,11 +80,12 @@ variable "dataproc" {
             hosts_count = number
             })
 
-        # compute_resources = list(object({
-        #     resource_preset_id = string
-        #     disk_type_id       = string
-        #     disk_size          = number
-        #     }))
+        compute_resources = object({
+            resource_preset_id = string
+            disk_type_id       = string
+            disk_size          = number
+            hosts_count = number
+            })
 
         data_resources = object({
           resource_preset_id = string
