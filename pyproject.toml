@@ -3,8 +3,12 @@ name = "otus-mlops"
 version = "0.1.0"
 description = "MLOps Otus Repo For Hometasks"
 readme = "README.md"
-requires-python = ">=3.12"
-dependencies = []
+requires-python = ">=3.11"
+dependencies = [
+    "findspark>=2.0.1",
+    "pyspark>=3.5.0",
+    "tqdm>=4.67.1",
+]
 
 [dependency-groups]
 data-analyse = [
@@ -15,4 +19,6 @@ dev = [
     "mypy>=1.16.0",
     "pandas-stubs>=2.2.3.250527",
     "pre-commit>=4.2.0",
+    "types-tqdm>=4.67.0.20250516",
 ]
+

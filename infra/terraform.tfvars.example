@@ -42,7 +42,7 @@ virtual_machine = {
 }
 
 dataproc_settings = {
-    version = "2.0"
+    version = "2.2"   # 2.0 is not supported for data-analysis tasks
     service_account_name = "brusia-dataproc-service-account"
 
     master_resource = {

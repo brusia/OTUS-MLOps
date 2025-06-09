@@ -1,22 +1,25 @@
 from abc import ABC, abstractmethod
-from typing import Final, Iterator
+from pathlib import Path
+from typing import Final, Generic, Iterator, TypeVar
 from enum import StrEnum, auto
 
-import pandas as pd
+from otus_mlops.internals.interfaces._base import DataFrame
+
 
 
 CSV_EXTENSION: Final[str] = ".csv"
-
+TXT_EXTENSION: Final[str] = ".txt"
+PARQUET_EXTENSION: Final[str] = ".parquet"
 
 class LoadingMethod(StrEnum):
     FullDataset = auto()
     OneByOne = auto()
 
 
-class IDataLoader(ABC):
+class IDataLoader(ABC, Generic[DataFrame]):
     def __init__(self):
         super().__init__()
 
     @abstractmethod
-    def load(self) -> pd.DataFrame | Iterator[pd.DataFrame]:
+    def load(self, data_dir: str | Path, loading_method: LoadingMethod = LoadingMethod.OneByOne) -> DataFrame | Iterator[DataFrame]:
         raise NotImplementedError

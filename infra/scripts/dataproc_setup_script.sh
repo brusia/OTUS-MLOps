@@ -23,10 +23,13 @@ hdfs dfs -mkdir -p /user/ubuntu/data
 if [ -n "$FILE_NAME" ]; then
     # Копируем конкретный файл
     log "Copying specific file from S3 to HDFS"
-    hadoop distcp "s3a://\{\{ s3_bucket \}\}/$FILE_NAME" "/user/ubuntu/data/$FILE_NAME"
+    hadoop distcp "s3a://{{ s3_bucket }}/$FILE_NAME" "/user/ubuntu/data/$FILE_NAME"
 else
     # Копируем все данные
     log "Copying all data from S3 to HDFS"
+    hadoop distcp "s3a://{{ s3_bucket }}/2019-08-22.txt" /user/ubuntu/data/2019-08-22.txt
+    hadoop distcp "s3a://{{ s3_bucket }}/2020-05-18.txt" /user/ubuntu/data/2020-05-18.txt
+    hadoop distcp "s3a://{{ s3_bucket }}/2022-05-08.txt" /user/ubuntu/data/2022-05-08.txt
     # hadoop distcp "s3a://\{\{ s3_bucket \}\}/*" /user/ubuntu/data
 fi
 
@@ -42,8 +45,21 @@ else
     exit 1
 fi
 
-cd /user/ubuntu/repo
-python3 -m pip install uv
-python3 -m uv sync
-python3 -m uv run src/otus-mlops/scripts/analyse_data.py
 
+# Временное решение. В дальнейшем в локальной сети dataproc-кластера будет развёрнут артефакторий. Из артефактория dataproc кластер будет устанавливать python-пакет. Пока же мы этот пакет собираем из репозитория.
+# Клонируем репозиторий github на data-proc-кластер
+git clone \{\{ git_repo \}\}
+cd OTUS-MLOps
+git checkout hometask_3
+python3 -m pip install uv
+# uv python pin /opt/conda/...
+uv venv --system-site-packages
+uv sync --group data-analyse
+uv pip install -e .
+
+uv run src/otus_mlops/scripts/analyse_data.py
+
+
+# hadoop distcp "s3a://brusia-bucket/data/raw/2019-08-22.txt" /user/ubuntu/data/2019-08-22.txt
+# hadoop distcp "s3a://brusia-bucket/data/raw/2020-05-18.txt" /user/ubuntu/data/2020-05-18.txt
+# hadoop distcp "s3a://brusia-bucket/data/raw/2022-05-08.txt" /user/ubuntu/data/2022-05-08.txt
