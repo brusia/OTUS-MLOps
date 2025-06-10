@@ -1,5 +1,6 @@
 from __future__ import annotations
-from enum import StrEnum, auto
+from enum import auto
+from strenum import StrEnum
 from pathlib import Path
 from typing import Final, Iterator, override
 

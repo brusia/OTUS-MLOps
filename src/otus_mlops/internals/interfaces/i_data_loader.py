@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Final, Generic, Iterator, TypeVar
-from enum import StrEnum, auto
+from enum import auto
+from strenum import StrEnum
 
 from otus_mlops.internals.interfaces._base import DataFrame
 

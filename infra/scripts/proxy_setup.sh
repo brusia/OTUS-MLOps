@@ -162,8 +162,8 @@ log "Copying dataproc_setup_script.sh script to proxy machine"
 cat > $HOME/scripts/dataproc_setup_script.sh << 'EOL'
 ${dataproc_init_content}
 EOL
-sed -i 's/{{ s3_bucket }}/'$TARGET_BUCKET'\/data\/raw/g' $HOME/scripts/dataproc.sh
-sed -i 's/{{ git_repo }}/'${git_repo}'/g' $HOME/scripts/dataproc.sh
+sed -i 's/{{ s3_bucket }}/$TARGET_BUCKET\/data\/raw/g' $HOME/scripts/dataproc.sh
+sed -i 's/{{ git_repo }}/${git_repo}/g' $HOME/scripts/dataproc.sh
 
 # Устанавливаем правильные разрешения для скрипта на прокси-машине
 log "Setting permissions for dataproc_setup_script.sh on proxy machine"
