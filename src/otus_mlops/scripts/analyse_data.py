@@ -1,3 +1,4 @@
+from pyspark.sql import functions as F
 from evidently import DataDefinition, Dataset
 
 from otus_mlops.internals.data.analysers._evidently import EvidentlyDataAnalyser
@@ -21,9 +22,11 @@ def analyse():
     schema = DataDefinition(
     numerical_columns=["tranaction_id", "customer_id", "terminal_id", "tx_amont", "tx_time_seconds", "tx_time_days", "tx_fraud", "tx_fraud_scenario"],
     )
+    print(schema)
 
     print("load data")
     dataset = data_loader.load(loading_method=LoadingMethod.FullDataset)
+    print(dataset.schema)
 
     print("analyse")
     res = spark_data_analyser.analyse(dataset)
@@ -37,7 +40,8 @@ def analyse():
     print("Feature correlations")
     print(res.correlations)
 
-    evidently_data_analyser.analyse(dataset=Dataset.from_any(data=dataset, data_definition=schema))
+    pandas_data = dataset.limit(10000).withColumn("tx_datetime", F.col("tx_datetime").cast("datetime64[ns]")).toPandas()
+    evidently_data_analyser.analyse(dataset=Dataset.from_pandas(data=pandas_data, data_definition=schema))
 
     print("Finished.")
 

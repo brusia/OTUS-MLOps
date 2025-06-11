@@ -111,14 +111,14 @@ resource "yandex_dataproc_cluster" "dataproc_cluster" {
     version_id = var.dataproc.version
 
     hadoop {
-      services = ["HDFS", "YARN", "SPARK", "TEZ", "HIVE"]
+      services = ["HDFS", "YARN", "SPARK"]
       properties = {
         "yarn:yarn.resourcemanager.am.max-attempts" = 5
       }
       ssh_public_keys = [file(var.ssh_key.public_key_path)]
     }
 
-    # TODO: dinamic instantiate from cfg
+    # TODO: dynamic instantiate from cfg
     subcluster_spec {
       name = "master"
       role = "MASTERNODE"
@@ -144,17 +144,17 @@ resource "yandex_dataproc_cluster" "dataproc_cluster" {
       hosts_count = var.dataproc.data_resources.hosts_count
     }
 
-    subcluster_spec {
-      name = "compute"
-      role = "COMPUTENODE"
-      resources {
-        resource_preset_id = var.dataproc.compute_resources.resource_preset_id
-        disk_type_id       = var.dataproc.compute_resources.disk_type_id
-        disk_size          = var.dataproc.compute_resources.disk_size
-      }
-      subnet_id   = module.network.subnet_id
-      hosts_count = var.dataproc.compute_resources.hosts_count
-    }
+    # subcluster_spec {
+    #   name = "compute"
+    #   role = "COMPUTENODE"
+    #   resources {
+    #     resource_preset_id = var.dataproc.compute_resources.resource_preset_id
+    #     disk_type_id       = var.dataproc.compute_resources.disk_type_id
+    #     disk_size          = var.dataproc.compute_resources.disk_size
+    #   }
+    #   subnet_id   = module.network.subnet_id
+    #   hosts_count = var.dataproc.compute_resources.hosts_count
+    # }
   }
 }
 

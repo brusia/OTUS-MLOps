@@ -48,7 +48,7 @@ fi
 
 # Временное решение. В дальнейшем в локальной сети dataproc-кластера будет развёрнут артефакторий. Из артефактория dataproc кластер будет устанавливать python-пакет. Пока же мы этот пакет собираем из репозитория.
 # Клонируем репозиторий github на data-proc-кластер
-git clone \{\{ git_repo \}\}
+git clone {{ git_repo }}
 cd OTUS-MLOps
 git checkout hometask_3
 python3 -m pip install uv

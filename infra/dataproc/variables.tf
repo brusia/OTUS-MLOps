@@ -80,12 +80,12 @@ variable "dataproc" {
             hosts_count = number
             })
 
-        compute_resources = object({
-            resource_preset_id = string
-            disk_type_id       = string
-            disk_size          = number
-            hosts_count = number
-            })
+        # compute_resources = object({
+        #     resource_preset_id = string
+        #     disk_type_id       = string
+        #     disk_size          = number
+        #     hosts_count = number
+        #     })
 
         data_resources = object({
           resource_preset_id = string

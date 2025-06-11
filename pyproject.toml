@@ -6,7 +6,7 @@ readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
     "findspark>=2.0.1",
-    "pyspark>=3.0.3",
+    "pyspark==3.0.3",
     "strenum>=0.4.15",
     "tqdm>=4.67.1",
 ]
