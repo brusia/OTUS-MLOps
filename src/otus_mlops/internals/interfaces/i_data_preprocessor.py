@@ -11,5 +11,5 @@ class IDataPreprocessor(ABC, Generic[InputData, InputData]):
         super().__init__()
 
     @abstractmethod
-    def load(self, input_data: InputData) -> InputData:
+    def preprocess(self, input_data: InputData) -> InputData:
         raise NotImplementedError

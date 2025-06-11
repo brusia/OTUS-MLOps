@@ -30,12 +30,11 @@ class EvidentlyProcessor(IDataPreprocessor[SparkDataFrame, pd.DataFrame]):
         else:
             sample_df = input_data
 
-        numeric_cols = [f.name for f in sample_df.schema.fields 
-                    if (f.dataType.kind in ['N', 'D'] or 
-                        (isinstance(f.dataType, StringType) and f.metadata.get("numeric")))]
+        numeric_cols = [f.name for f in sample_df.schema.fields
+                        if (isinstance(f.dataType, (NumericType, DoubleType) or
+                        (isinstance(f.dataType, StringType) and f.metadata.get("numeric"))))]
         categorical_cols = [f.name for f in sample_df.schema.fields 
-                        if f.dataType.kind == 'S' or 
-                            (isinstance(f.dataType, StringType) and not any(x in f.metadata.get("exclude_for_model", []) for x in ['numeric', 'id']))]
+                            if (isinstance(f.dataType, StringType) and not any(x in f.metadata.get("exclude_for_model", []) for x in ['numeric', 'id']))]
         
         all_cols = list(set(numeric_cols + categorical_cols + ([target_col] if target_col else [])))
         all_cols = [col for col in all_cols if col is not None and col in sample_df.columns]

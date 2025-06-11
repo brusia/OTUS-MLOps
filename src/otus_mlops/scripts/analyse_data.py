@@ -7,7 +7,7 @@ from otus_mlops.internals.data.analysers._spark_custom import SparkCustomDataAna
 # from otus_mlops.internals.data.loaders._spark_raw import FraudRawDataLoader
 from otus_mlops.internals.data.loaders._spark_raw import SparkRawDataLoader
 from otus_mlops.internals.interfaces.i_data_loader import LoadingMethod
-
+import pandas as pd
 
 
 def analyse():
@@ -25,22 +25,24 @@ def analyse():
     print(schema)
 
     print("load data")
-    dataset = data_loader.load(loading_method=LoadingMethod.FullDataset)
+    dataset = data_loader.load()
     print(dataset.schema)
 
     print("analyse")
-    res = spark_data_analyser.analyse(dataset)
+#    res = spark_data_analyser.analyse(dataset)
 
-    print("base statistics")
-    print(res.base_stats)
+ #   print("base statistics")
+  #  print(res.base_stats)
 
-    print("categorical statistics")
-    print(res.categorical_stats)
+  #  print("categorical statistics")
+  #  print(res.categorical_stats)
 
-    print("Feature correlations")
-    print(res.correlations)
+   # print("Feature correlations")
+   # print(res.correlations)
 
-    pandas_data = dataset.limit(10000).withColumn("tx_datetime", F.col("tx_datetime").cast("datetime64[ns]")).toPandas()
+    pandas_data = dataset.limit(10000).withColumn("tx_datetime", F.col("tx_datetime").cast('string')).toPandas()
+    pandas_data["tx_datetime"] = pd.to_datetime(pandas_data["tx_datetime"], errors='coerce')
+    print(pandas_data.head(n=5).to_string(index=False))
     evidently_data_analyser.analyse(dataset=Dataset.from_pandas(data=pandas_data, data_definition=schema))
 
     print("Finished.")

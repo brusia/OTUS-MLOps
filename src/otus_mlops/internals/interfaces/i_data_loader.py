@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Final, Generic, Iterator, TypeVar
+from typing import Final, Generic, Iterator, TypeVar, Union
 from enum import auto
 from strenum import StrEnum
 
@@ -22,5 +22,5 @@ class IDataLoader(ABC, Generic[DataFrame]):
         super().__init__()
 
     @abstractmethod
-    def load(self, data_dir: str | Path, loading_method: LoadingMethod = LoadingMethod.OneByOne) -> DataFrame | Iterator[DataFrame]:
+    def load(self, data_dir: Union[str, Path], loading_method: LoadingMethod = LoadingMethod.OneByOne) -> DataFrame | Iterator[DataFrame]:
         raise NotImplementedError

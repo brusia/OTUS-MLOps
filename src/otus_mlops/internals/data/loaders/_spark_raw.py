@@ -85,13 +85,13 @@ class SparkRawDataLoader(IDataLoader[SparkDataFrame]):
         ])
 
 
-        # frame = self._spark.read.csv(f"hdfs://{data_path.as_posix()}*", schema=custom_schema)
-        frame = self._spark.read.format("csv") \
-            .option("inferSchema", "true") \
-            .option("header", "false") \
-            .option("skipRows", 1) \
-            .option("delimiter", ",") \
-            .load("f"hdfs://{data_path.as_posix()}*")
+        frame = self._spark.read.csv(f"hdfs://{data_path.as_posix()}*", schema=custom_schema).dropna(how="all")
+        # frame = self._spark.read.format("csv") \
+        #     .option("inferSchema", "true") \
+        #     .option("header", "false") \
+        #     .option("skipRows", 1) \
+        #     .option("delimiter", ",") \
+        #     .load("f"hdfs://{data_path.as_posix()}*")
         return frame
         # files = self._spark.sparkContext.textFile(f"hdfs://{data_path.as_posix()}*").keys().collect()
         # # print(files)

@@ -1,3 +1,4 @@
+cat src/otus_mlops/internals/data/analysers/_spark_custom.py
 
 from pyspark.sql import functions as F
 
@@ -10,8 +11,8 @@ from pyspark.sql.window import Window
 from pyspark.sql.functions import col, expr, when, lit, countDistinct, count
 from pyspark.sql.types import DoubleType, StringType, NumericType, DateType
 
-# from pyspark.ml.stat import Correlation
-# from pyspark.ml.feature import VectorAssembler
+from pyspark.ml.stat import Correlation
+from pyspark.ml.feature import VectorAssembler
 
 # from pyspark.sql.functions import countDistinct
 # from evidently import Calculator
@@ -29,7 +30,7 @@ ROUND_LEVEL_CATEGORIAL: Final[int] = 3
 class CustomStatistics:
     base_stats: pd.DataFrame
     categorical_stats: pd.DataFrame
-    # correlations: pd.DataFrame
+    correlations: pd.DataFrame
 
 # class SparkCustomDataAnalyser(IDataAnalyser[SparkDataFrame, pd.DataFrame]):
 class SparkCustomDataAnalyser:
@@ -42,10 +43,10 @@ class SparkCustomDataAnalyser:
         print(data_frame.show(5))
         base_stats = self._calculate_basic_statistics(data_frame, field_names)
         categorical_stats = self._calculate_categorical_stats(data_frame)
-        # correlations = self._calculate_correlations(data_frame, numerical_cols)
+        correlations = self._calculate_correlations(data_frame, field_names)
 
-        # return CustomStatistics(base_stats=base_stats, categorical_stats=categorical_stats, correlations=correlations)
-        return CustomStatistics(base_stats=base_stats, categorical_stats=categorical_stats)
+        return CustomStatistics(base_stats=base_stats, categorical_stats=categorical_stats, correlations=correlations)
+       #  return CustomStatistics(base_stats=base_stats, categorical_stats=categorical_stats)
 
 
     def _calculate_basic_statistics(self, frame: SparkDataFrame, numerical_cols: List[str]) -> pd.DataFrame:
@@ -86,21 +87,47 @@ class SparkCustomDataAnalyser:
             # *(F.percentile_approx(c, 0.25).cast("double").alias(f"{c}_25p") for c in numerical_cols),  # 25-й перцентиль
             # *(F.percentile_approx(c, 0.75).cast("double").alias(f"{c}_75p") for c in numerical_cols)  # 75-й перцентиль
         ])
-        return numeric_stats.round(ROUND_LEVEL_NUMERIC)
+        return numeric_stats
     
 
-    # def _calculate_correlations(self, data_frame: SparkDataFrame, numeric_cols: list[str]) -> pd.DataFrame:
-    #     assembler = VectorAssembler(inputCols=numeric_cols, outputCol="features")
-    #     df_vector = assembler.transform(data_frame).select("features")
+    def _calculate_correlations(self, data_frame: SparkDataFrame, numeric_cols: List[str]) -> pd.DataFrame:
+        assembler = VectorAssembler(inputCols=numeric_cols, outputCol="features")
+        df_vector = assembler.transform(data_frame).select("features")
 
-    #     correlation = Correlation.corr(df_vector, "features", "pearson").first()[0]
-    #     correlation_matrix = np.array(correlation.values).squeeze()
+        correlation = Correlation.corr(df_vector, "features", "pearson").first()[0]
+        correlation_matrix = np.array(correlation.toArray()).reshape(len(numeric_cols), len(numeric_cols))
         
-    #     corr_df = pd.DataFrame(correlation_matrix, 
-    #                         index=numeric_cols, 
-    #                         columns=numeric_cols)
+        corr_df = pd.DataFrame(correlation_matrix, 
+                            index=numeric_cols, 
+                            columns=numeric_cols)
         
-    #     return corr_df.round(ROUND_LEVEL_CATEGORIAL)
+        return corr_df.round(ROUND_LEVEL_CATEGORIAL)
+
+
+    def _calculate_categorical_stats(self, frame: SparkDataFrame) -> pd.DataFrame:
+        # categorical_cols = [f.name for f in frame.schema.fields
+        #                     if (isinstance(f.dataType, StringType) and not any(x in f.metadata.get("exclude_for_model", []) for x in ['numeric', 'id']))]
+        categorical_cols = [f.name for f in frame.schema.fields
+                        if isinstance(f.dataType, StringType)]
+        sample_size = min(100000, frame.count())
+        
+        # TODO: debug
+        if sample_size > 2 * PARTITIONS_COUNT:  # frame.sparkSession.sparkContext.getConf().getInt("spark.sql.shuffle.partitions", 100):
+            print("Ограничена выборка для категориальных признаков")
+            sample_df = frame.sample(False, sample_size/float(frame.count()))
+        else:
+            sample_df = frame
+        
+        freq_data = {}
+        for col in categorical_cols:
+            freq_rdd = sample_df.groupBy(col).agg(count("*").alias("count")).sort(col)
+            freq = [(row[0], round(row[1], 2)) for row in freq_data[col]]
+            freq_data[col] = freq
+            
+            top_10 = pd.DataFrame([(k, v) for col, freqs in freq_data.items() 
+                                for k, v in freqs[:10]], columns=[col, "percentage"])
+        
+        return freq_data
 
     # def _process_target_variable(df, target_col):
     #     result = {
