@@ -22,5 +22,5 @@ class IDataLoader(ABC, Generic[DataFrame]):
         super().__init__()
 
     @abstractmethod
-    def load(self, data_dir: Union[str, Path], loading_method: LoadingMethod = LoadingMethod.OneByOne) -> DataFrame | Iterator[DataFrame]:
+    def load(self, data_dir: Union[str, Path], loading_method: LoadingMethod = LoadingMethod.OneByOne) -> Union[DataFrame, Iterator[DataFrame]]:
         raise NotImplementedError

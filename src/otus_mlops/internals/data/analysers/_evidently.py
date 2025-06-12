@@ -8,7 +8,7 @@ from evidently.ui.workspace import RemoteWorkspace  # type: ignore[import-untype
 from evidently import DataDefinition, Dataset, Report  # type: ignore[import-untyped, import-not-found]
 from evidently.presets import DataSummaryPreset  # type: ignore[import-untyped, import-not-found]
 
-from otus_mlops.internals.interfaces.i_data_analyser import REPORT_PATH, IDataAnalyser
+from otus_mlops.internals.interfaces import REPORT_PATH, IDataAnalyser
 
 from evidently.metrics import (
     CategoryCount,

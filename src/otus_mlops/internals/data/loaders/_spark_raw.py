@@ -2,7 +2,7 @@ from __future__ import annotations
 from enum import auto
 from strenum import StrEnum
 from pathlib import Path
-from typing import Final, Iterator
+from typing import Final, Iterator, Union
 
 import tqdm
 import pandas as pd
@@ -10,7 +10,7 @@ import findspark
 import os
 from pyspark.sql import SparkSession, DataFrame as SparkDataFrame
 from pyspark.sql.types import StructType, StructField, DoubleType, StringType, IntegerType, TimestampType
-from otus_mlops.internals.interfaces.i_data_loader import CSV_EXTENSION, PARQUET_EXTENSION, TXT_EXTENSION, IDataLoader, LoadingMethod
+from otus_mlops.internals.interfaces import CSV_EXTENSION, PARQUET_EXTENSION, TXT_EXTENSION, IDataLoader, LoadingMethod
 import sys
 DEFAULT_DATA_DIR: Final[Path] = Path("/user/ubuntu/data")
 
@@ -45,17 +45,18 @@ class SparkRawDataLoader(IDataLoader[SparkDataFrame]):
     # spark.sparkContext.setLogLevel("ERROR")
 
     # @override
-    def load(self, data_dir: str | Path = DEFAULT_DATA_DIR, loading_method: LoadingMethod = LoadingMethod.OneByOne) -> Union[SparkDataFrame, Iterator[SparkDataFrame]]:
+    # TODO
+    def load(self,  data_dir: str | Path = DEFAULT_DATA_DIR, loading_method: LoadingMethod = LoadingMethod.OneByOne) -> Union[SparkDataFrame, Iterator[SparkDataFrame]]:
         # print(data_dir)
-        data_path: Path
-        if isinstance(data_dir, Path) and data_dir.exists():
-            data_path = data_dir
+     #   data_path: Path
+      #  if isinstance(data_dir, Path) and data_dir.exists():
+       #     data_path = data_dir
         # print(data_path)
-        elif isinstance(data_dir, str) and Path(data_dir).exists():
-            data_path = Path(data_dir)
+       # elif isinstance(data_dir, str) and Path(data_dir).exists():
+       #     data_path = Path(data_dir)
 
-        print(data_path)
-        
+     #   print(data_path)
+        data_path = data_dir
         if loading_method == LoadingMethod.FullDataset:
                 return self._load_full(data_path)
         else: #  LoadingMethod.OneByOne:
@@ -69,9 +70,8 @@ class SparkRawDataLoader(IDataLoader[SparkDataFrame]):
 
         return self._spark.union(*frames)
 
+    # TODO: customized schema for unify the input data format
     def _load_one_by_one(self, data_path: Path) -> Iterator[SparkDataFrame]:
-        # print(data_path)
-
         custom_schema = StructType([
             StructField("transaction_id", IntegerType(), True),
             StructField("tx_datetime", TimestampType(), True),
@@ -84,14 +84,8 @@ class SparkRawDataLoader(IDataLoader[SparkDataFrame]):
             StructField("tx_fraud_scenario", IntegerType(), True)
         ])
 
-
+        # TODO: not one by one (!)
         frame = self._spark.read.csv(f"hdfs://{data_path.as_posix()}*", schema=custom_schema).dropna(how="all")
-        # frame = self._spark.read.format("csv") \
-        #     .option("inferSchema", "true") \
-        #     .option("header", "false") \
-        #     .option("skipRows", 1) \
-        #     .option("delimiter", ",") \
-        #     .load("f"hdfs://{data_path.as_posix()}*")
         return frame
         # files = self._spark.sparkContext.textFile(f"hdfs://{data_path.as_posix()}*").keys().collect()
         # # print(files)

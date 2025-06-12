@@ -162,8 +162,8 @@ log "Copying dataproc_setup_script.sh script to proxy machine"
 cat > $HOME/scripts/dataproc_setup_script.sh << 'EOL'
 ${dataproc_init_content}
 EOL
-sed -i 's/{{ s3_bucket }}/'$TARGET_BUCKET'\/data\/raw/g' $HOME/scripts/dataproc.sh
-sed -i 's/{{ git_repo }}/'${git_repo}'/g' $HOME/scripts/dataproc.sh
+sed -i "s/{{ s3_bucket }}/$${TARGET_BUCKET}\/data\/raw/g" $HOME/scripts/dataproc_setup_script.sh
+sed -i "s/{{ git_repo }}/${git_repo}/g" $HOME/scripts/dataproc_setup_script.sh
 
 # Устанавливаем правильные разрешения для скрипта на прокси-машине
 log "Setting permissions for dataproc_setup_script.sh on proxy machine"
@@ -186,7 +186,7 @@ log "Create logs directory on dataproc master node"
 ssh -i $HOME/.ssh/dataproc_key -o StrictHostKeyChecking=no $DATAPROC_HOST "mkdir -p $${HOME}/scripts"
 
 log "Copy dataproc_setup_script.sh script to master node"
-rsync -a $HOME/scripts/dataproc_setup_script.sh $DATAPROC_HOST:$HOME/scripts/dataproc_setup_script.sh
+rsync -a $HOME/scripts/dataproc_setup_script.sh $DATAPROC_HOST:$HOME/scripts/setup_script.sh
 if [ $? -eq 0 ]; then
     log "Copy succesfull"
 else
@@ -196,14 +196,14 @@ fi
 
 # Устанавливаем правильные разрешения для скрипта на мастер-ноде
 log "Setting permissions for dataproc_setup_script.sh on master node"
-ssh -i $HOME/.ssh/dataproc_key -o StrictHostKeyChecking=no $DATAPROC_HOST "chmod +x $${HOME}/scripts/dataproc_setup_script.sh"
+ssh -i $HOME/.ssh/dataproc_key -o StrictHostKeyChecking=no $DATAPROC_HOST "chmod +x $${HOME}/scripts/setup_script.sh"
 
 # Копируем репо на proxy-машину
-rsync -a $HOME/scripts/repo $DATAPROC_HOST:$HOME/repo/otus-mlops
+# rsync -a $HOME/scripts/repo $DATAPROC_HOST:$HOME/repo/otus-mlops
 
 log "Running dataproc_setup_script on dataproc master node"
 mkdir -p $HOME/logs
-ssh -i $HOME/.ssh/dataproc_key -o StrictHostKeyChecking=no ubuntu@$DATAPROC_MASTER_FQDN $${HOME}/scripts/dataproc_setup_script.sh 2019-08-22.txt > $HOME/logs/dataproc_master_execution.log 2>&1
+ssh -i $HOME/.ssh/dataproc_key -o StrictHostKeyChecking=no ubuntu@$DATAPROC_MASTER_FQDN "$${HOME}/scripts/setup_script.sh" > $HOME/logs/dataproc_master_execution.log 2>&1
 
 log "dataproc_setup_script results"
 cat $HOME/logs/dataproc_master_execution.log

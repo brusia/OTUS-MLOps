@@ -1,9 +1,7 @@
-cat src/otus_mlops/internals/data/analysers/_spark_custom.py
-
 from pyspark.sql import functions as F
 
 from dataclasses import dataclass
-from typing import Final, List
+from typing import Dict, Final, List
 import numpy as np
 import pandas as pd
 from pyspark.sql import DataFrame as SparkDataFrame
@@ -29,11 +27,16 @@ ROUND_LEVEL_CATEGORIAL: Final[int] = 3
 @dataclass
 class CustomStatistics:
     base_stats: pd.DataFrame
-    categorical_stats: pd.DataFrame
+    # categorical_stats: pd.DataFrame
     correlations: pd.DataFrame
+    targets: Dict[str, pd.DataFrame]
+    histo: Dict[str, list[float]]
 
-# class SparkCustomDataAnalyser(IDataAnalyser[SparkDataFrame, pd.DataFrame]):
-class SparkCustomDataAnalyser:
+class SparkCustomDataAnalyser(IDataAnalyser[SparkDataFrame, pd.DataFrame]):
+    def __init__(self, target_columns: List[str] = None, bins_count: int = 10):
+        self._targets = target_columns
+        self._bins = bins_count
+
     def analyse(self, data_frame: SparkDataFrame) -> CustomStatistics:
         field_names = [ f.name for f in data_frame.schema.fields
                         if isinstance(f.dataType, (NumericType, DoubleType))
@@ -42,50 +45,34 @@ class SparkCustomDataAnalyser:
 
         print(data_frame.show(5))
         base_stats = self._calculate_basic_statistics(data_frame, field_names)
-        categorical_stats = self._calculate_categorical_stats(data_frame)
+        # categorical_stats = self._calculate_categorical_stats(data_frame)
         correlations = self._calculate_correlations(data_frame, field_names)
 
-        return CustomStatistics(base_stats=base_stats, categorical_stats=categorical_stats, correlations=correlations)
-       #  return CustomStatistics(base_stats=base_stats, categorical_stats=categorical_stats)
+        targets = {}
+        if self._targets:
+            for target_column_name in self._targets:
+                targets[target_column_name] = self._process_target_variable(data_frame, target_column_name)
+
+        histo = {}
+        for field_name in field_names:
+            histo[field_name] = self._calculate_distributions(data_frame, field_name)
+        return CustomStatistics(base_stats=base_stats,
+                                # categorical_stats=categorical_stats,
+                                correlations=correlations,
+                                targets = targets,
+                                histo=histo)
 
 
     def _calculate_basic_statistics(self, frame: SparkDataFrame, numerical_cols: List[str]) -> pd.DataFrame:
-
-        # basic_stats = frame.select(numerical_cols + [F.count("*").alias("sample_size")])
-
-        # window_spec = Window.orderBy(lit(""))
-        
-        # mean_values = basic_stats.agg(*(expr(f"avg({col})").cast("double").alias(col) for col in numerical_cols))
-        # std_values = basic_stats.agg(*(expr(f"stddev_pop({col})").cast("double").alias(col) for col in numerical_cols))
-        # min_values = basic_stats.agg(*(expr(f"min({col})").cast("double").alias(col) for col in numerical_cols))
-        # max_values = basic_stats.agg(*(expr(f"max({col})").cast("double").alias(col) for col in numerical_cols))
-        # q1_values = basic_stats.agg(*(expr(f"percentile_approx({col}, 0.25)").cast("double").alias(col) for col in numerical_cols))
-        # q3_values = basic_stats.agg(*(expr(f"percentile_approx({col}, 0.75)").cast("double").alias(col) for col in numerical_cols))
-        
-        # # Объединяем результаты
-        # numeric_stats = pd.concat([
-        #     mean_values.toPandas(),
-        #     std_values.toPandas(),
-        #     min_values.toPandas(),
-        #     max_values.toPandas(),
-        #     q1_values.toPandas(),
-        #     q3_values.toPandas()
-        # ], axis=1)
-        
-        # numeric_stats.index = ["mean", "std_dev", "min", "max", "25th_percentile", "75th_percentile"]
-        # numeric_stats["n"] = basic_stats.select("sample_size").first()[0]
-
-        # return numeric_stats.round(ROUND_LEVEL_NUMERIC)
-
         numeric_stats = frame.agg(
         *[
-            F.count("*").alias("sample_size"),  # Общее количество записей
-            *(F.avg(c).cast("double").alias(c) for c in numerical_cols),  # Среднее значение
-            *(F.stddev_pop(c).cast("double").alias(f"{c}_std") for c in numerical_cols),  # Стандартное отклонение
-            *(F.min(c).cast("double").alias(f"{c}_min") for c in numerical_cols),  # Минимальное значение
-            *(F.max(c).cast("double").alias(f"{c}_max") for c in numerical_cols),  # Максимальное значение
-            # *(F.percentile_approx(c, 0.25).cast("double").alias(f"{c}_25p") for c in numerical_cols),  # 25-й перцентиль
-            # *(F.percentile_approx(c, 0.75).cast("double").alias(f"{c}_75p") for c in numerical_cols)  # 75-й перцентиль
+            F.count("*").alias("sample_size"),
+            *(F.avg(c).cast("double").alias(c) for c in numerical_cols),
+            *(F.stddev_pop(c).cast("double").alias(f"{c}_std") for c in numerical_cols),
+            *(F.min(c).cast("double").alias(f"{c}_min") for c in numerical_cols),
+            *(F.max(c).cast("double").alias(f"{c}_max") for c in numerical_cols),
+            *(F.expr(f"percentile_approx({c}, {0.25}, {100000})").cast("double").alias(f"{c}_25p") for c in numerical_cols),
+            *(F.expr(f"percentile_approx({c}, {0.75}, {100000})").cast("double").alias(f"{c}_75p") for c in numerical_cols)
         ])
         return numeric_stats
     
@@ -105,8 +92,6 @@ class SparkCustomDataAnalyser:
 
 
     def _calculate_categorical_stats(self, frame: SparkDataFrame) -> pd.DataFrame:
-        # categorical_cols = [f.name for f in frame.schema.fields
-        #                     if (isinstance(f.dataType, StringType) and not any(x in f.metadata.get("exclude_for_model", []) for x in ['numeric', 'id']))]
         categorical_cols = [f.name for f in frame.schema.fields
                         if isinstance(f.dataType, StringType)]
         sample_size = min(100000, frame.count())
@@ -129,13 +114,17 @@ class SparkCustomDataAnalyser:
         
         return freq_data
 
-    # def _process_target_variable(df, target_col):
-    #     result = {
-    #         "min": df.selectExpr(f"min({target_col})").first()[0],
-    #         "max": df.selectExpr(f"max({target_col})").first()[0],
-    #         "mean": df.selectExpr(f"avg({target_col})").first()[0],
-    #         "std": df.selectExpr(f"stddev_pop({target_col})").first()[0],
-    #         "count_null": df.selectExpr(f"count({target_col})").first()[0] / df.count() * 100,
-    #         "distribution": df.selectExpr(f"histogram({target_col}, 50)").first()[0]
-    #     }
-    #     return result
+    def _calculate_distributions(self, data_frame: SparkDataFrame, column_name: str):
+        quantiles = data_frame.approxQuantile(column_name, [i/self._bins for i in range(self._bins+1)], 0.01)
+        return [quantiles[i] for i in range(len(quantiles)-1)]
+
+    def _process_target_variable(self, frame: SparkDataFrame, target_column_name: str):
+        result = {
+            "min": frame.selectExpr(f"min({target_column_name})").first()[0],
+            "max": frame.selectExpr(f"max({target_column_name})").first()[0],
+            "mean": frame.selectExpr(f"avg({target_column_name})").first()[0],
+            "std": frame.selectExpr(f"stddev_pop({target_column_name})").first()[0],
+            "count_null": frame.selectExpr(f"count({target_column_name})").first()[0] / frame.count() * 100,
+            "distribution": frame.selectExpr(f"histogram({target_column_name}, 50)").first()[0]
+        }
+        return result
