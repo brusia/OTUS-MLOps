@@ -36,11 +36,16 @@ def analyse():
     print(len(res.base_stats))
     print(res.base_stats.head(n=10).to_string(index=False))
 
-    print("categorical statistics")
-    print(res.categorical_stats)
+    # print("categorical statistics")
+    # print(len(res.categorical_stats))
+    # print(res.categorical_stats.head(n=10).to_string(index=False))
 
     print("Feature correlations")
     print(res.correlations)
+
+    print("Targets")
+    for target in res.targets:
+        print(res.targets[target].head(10).to_string(index=False))
 
     pandas_data = dataset.limit(10000).withColumn("tx_datetime", F.col("tx_datetime").cast('string')).toPandas()
     pandas_data["tx_datetime"] = pd.to_datetime(pandas_data["tx_datetime"], errors='coerce')
