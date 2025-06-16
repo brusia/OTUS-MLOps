@@ -13,7 +13,6 @@ SAMPLES_COUNT: Final[int] = 100000
 _logger = logging.getLogger(__name__)
 
 class EvidentlyProcessor(IDataPreprocessor[SparkDataFrame, pd.DataFrame]):
-
     def preprocess(self, input_data: SparkDataFrame) -> pd.DataFrame:
         sample_size = min(SAMPLES_COUNT, input_data.count())
         _logger.debug("Samples count is '%s', total was  '%s'", sample_size, input_data.count())

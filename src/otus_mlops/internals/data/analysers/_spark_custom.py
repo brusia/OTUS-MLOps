@@ -1,7 +1,7 @@
 from pyspark.sql import functions as F
 
 from dataclasses import dataclass
-from typing import Dict, Final, List
+from typing import Dict, Final, List, Any
 import numpy as np
 import pandas as pd
 from pyspark.sql import DataFrame as SparkDataFrame
@@ -21,7 +21,7 @@ from otus_mlops.internals.interfaces.i_data_analyser import IDataAnalyser
 PARTITIONS_COUNT: Final[int] = 100
 ROUND_LEVEL_NUMERIC: Final[int] = 4
 ROUND_LEVEL_CATEGORIAL: Final[int] = 3
-
+UNIQUE_COLUMN_NAME: Final[str] = "transaction_id"
 
 # TODO: update fields with data classes
 @dataclass
@@ -30,7 +30,7 @@ class CustomStatistics:
     # categorical_stats: pd.DataFrame
     correlations: pd.DataFrame
     targets: Dict[str, pd.DataFrame]
-    histo: Dict[str, list[float]]
+    histo: Dict[str, List[float]]
 
 class SparkCustomDataAnalyser(IDataAnalyser[SparkDataFrame, pd.DataFrame]):
     def __init__(self, target_columns: List[str] = None, bins_count: int = 10):
@@ -42,8 +42,6 @@ class SparkCustomDataAnalyser(IDataAnalyser[SparkDataFrame, pd.DataFrame]):
                         if isinstance(f.dataType, (NumericType, DoubleType))
                         or (isinstance(f.dataType, StringType) and f.metadata.get("numeric")) ]
         
-
-        print(data_frame.show(5))
         base_stats = self._calculate_basic_statistics(data_frame, field_names)
         # categorical_stats = self._calculate_categorical_stats(data_frame)
         correlations = self._calculate_correlations(data_frame, field_names)
@@ -63,10 +61,11 @@ class SparkCustomDataAnalyser(IDataAnalyser[SparkDataFrame, pd.DataFrame]):
                                 histo=histo)
 
 
-    def _calculate_basic_statistics(self, frame: SparkDataFrame, numerical_cols: List[str]) -> pd.DataFrame:
+    def _calculate_basic_statistics(self, frame: SparkDataFrame, numerical_cols: List[str], unique_col: str = UNIQUE_COLUMN_NAME) -> pd.DataFrame:
         numeric_stats = frame.agg(
         *[
             F.count("*").alias("sample_size"),
+            F.countDistinct(unique_col).alias("__distinct_count_temp"), 
             *(F.avg(c).cast("double").alias(c) for c in numerical_cols),
             *(F.stddev_pop(c).cast("double").alias(f"{c}_std") for c in numerical_cols),
             *(F.min(c).cast("double").alias(f"{c}_min") for c in numerical_cols),
@@ -74,12 +73,18 @@ class SparkCustomDataAnalyser(IDataAnalyser[SparkDataFrame, pd.DataFrame]):
             *(F.expr(f"percentile_approx({c}, {0.25}, {100000})").cast("double").alias(f"{c}_25p") for c in numerical_cols),
             *(F.expr(f"percentile_approx({c}, {0.75}, {100000})").cast("double").alias(f"{c}_75p") for c in numerical_cols)
         ])
+
+        numeric_stats = numeric_stats.withColumn(
+            f"{unique_col}_duplicates",
+            F.col("sample_size") - F.col("__distinct_count_temp")
+        ).drop("__distinct_count_temp")
         return numeric_stats
     
 
     def _calculate_correlations(self, data_frame: SparkDataFrame, numeric_cols: List[str]) -> pd.DataFrame:
+        filtered_frame = data_frame.fillna(0, subset=numeric_cols)
         assembler = VectorAssembler(inputCols=numeric_cols, outputCol="features")
-        df_vector = assembler.transform(data_frame).select("features")
+        df_vector = assembler.transform(filtered_frame).select("features")
 
         correlation = Correlation.corr(df_vector, "features", "pearson").first()[0]
         correlation_matrix = np.array(correlation.toArray()).reshape(len(numeric_cols), len(numeric_cols))
@@ -91,40 +96,39 @@ class SparkCustomDataAnalyser(IDataAnalyser[SparkDataFrame, pd.DataFrame]):
         return corr_df.round(ROUND_LEVEL_CATEGORIAL)
 
 
-    def _calculate_categorical_stats(self, frame: SparkDataFrame) -> pd.DataFrame:
-        categorical_cols = [f.name for f in frame.schema.fields
-                        if isinstance(f.dataType, StringType)]
-        sample_size = min(100000, frame.count())
+    # def _calculate_categorical_stats(self, frame: SparkDataFrame) -> pd.DataFrame:
+    #     categorical_cols = [f.name for f in frame.schema.fields
+    #                     if isinstance(f.dataType, StringType)]
+    #     sample_size = min(100000, frame.count())
         
-        # TODO: debug
-        if sample_size > 2 * PARTITIONS_COUNT:  # frame.sparkSession.sparkContext.getConf().getInt("spark.sql.shuffle.partitions", 100):
-            print("Ограничена выборка для категориальных признаков")
-            sample_df = frame.sample(False, sample_size/float(frame.count()))
-        else:
-            sample_df = frame
+    #     # TODO: debug
+    #     if sample_size > 2 * PARTITIONS_COUNT:  # frame.sparkSession.sparkContext.getConf().getInt("spark.sql.shuffle.partitions", 100):
+    #         sample_df = frame.sample(False, sample_size/float(frame.count()))
+    #     else:
+    #         sample_df = frame
         
-        freq_data = {}
-        for col in categorical_cols:
-            freq_rdd = sample_df.groupBy(col).agg(count("*").alias("count")).sort(col)
-            freq = [(row[0], round(row[1], 2)) for row in freq_data[col]]
-            freq_data[col] = freq
+    #     freq_data = {}
+    #     for col in categorical_cols:
+    #         freq_rdd = sample_df.groupBy(col).agg(count("*").alias("count")).sort(col)
+    #         freq = [(row[0], round(row[1], 2)) for row in freq_data[col]]
+    #         freq_data[col] = freq
             
-            top_10 = pd.DataFrame([(k, v) for col, freqs in freq_data.items() 
-                                for k, v in freqs[:10]], columns=[col, "percentage"])
+    #         top_10 = pd.DataFrame([(k, v) for col, freqs in freq_data.items() 
+    #                             for k, v in freqs[:10]], columns=[col, "percentage"])
         
-        return freq_data
+    #     return freq_data
 
     def _calculate_distributions(self, data_frame: SparkDataFrame, column_name: str):
         quantiles = data_frame.approxQuantile(column_name, [i/self._bins for i in range(self._bins+1)], 0.01)
         return [quantiles[i] for i in range(len(quantiles)-1)]
 
-    def _process_target_variable(self, frame: SparkDataFrame, target_column_name: str):
+    def _process_target_variable(self, frame: SparkDataFrame, target_column_name: str) -> Dict[str, Any]:
         result = {
             "min": frame.selectExpr(f"min({target_column_name})").first()[0],
             "max": frame.selectExpr(f"max({target_column_name})").first()[0],
             "mean": frame.selectExpr(f"avg({target_column_name})").first()[0],
             "std": frame.selectExpr(f"stddev_pop({target_column_name})").first()[0],
             "count_null": frame.selectExpr(f"count({target_column_name})").first()[0] / frame.count() * 100,
-            "distribution": frame.selectExpr(f"histogram({target_column_name}, 50)").first()[0]
+            # "distribution": frame.selectExpr(f"histogram({target_column_name}, 50)").first()[0]
         }
         return result

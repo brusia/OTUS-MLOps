@@ -45,17 +45,18 @@ class EvidentlyDataAnalyser(IDataAnalyser[Dataset, pd.DataFrame]):
     def __init__(self, report_dir: str = ""):
         self._output_path = Path(report_dir) if report_dir else REPORT_PATH
 
-    def analyse(self, dataset: Dataset) -> None:
-        report = Report(metrics=[DataSummaryPreset(),], #  DriftedColumnsCount()],
-#            CategoryCount(), DriftedColumnsCount(), InListValueCount(), InRangeValueCount(),
- #           MaxValue(), MeanValue(), MedianValue(), MinValue(), MissingValueCount(), OutListValueCount(),
-  #          OutRangeValueCount(), QuantileValue(), StdValue(), UniqueValueCount(), ValueDrift(),
-   #         AlmostConstantColumnsCount(), AlmostDuplicatedColumnsCount(), ColumnCount(),
-    #        ConstantColumnsCount(), DatasetMissingValueCount(), DuplicatedColumnsCount(),
-     #       DuplicatedRowCount(), EmptyColumnsCount(), EmptyRowsCount(), RowCount()], 
-             include_tests="True")
+    def analyse(self, dataset: Dataset, ref: Dataset) -> None:
+        report = Report(metrics=[DataSummaryPreset(),
+                        DriftedColumnsCount()],
+                        # CategoryCount(), DriftedColumnsCount(), InListValueCount(), InRangeValueCount(),
+                        # MaxValue(), MeanValue(), MedianValue(), MinValue(), MissingValueCount(), OutListValueCount(),
+                        # OutRangeValueCount(), QuantileValue(), StdValue(), UniqueValueCount(), ValueDrift(),
+                        # AlmostConstantColumnsCount(), AlmostDuplicatedColumnsCount(), ColumnCount(),
+                        # ConstantColumnsCount(), DatasetMissingValueCount(), DuplicatedColumnsCount(),
+                        # DuplicatedRowCount(), EmptyColumnsCount(), EmptyRowsCount(), RowCount()], 
+                        include_tests="True")
 
-        snapshot = report.run(dataset)
+        snapshot = report.run(dataset, ref)
 
 #        snapshot.save_html(REPORT_PATH.absolute().joinpath(REPORT_NAME).as_posix())
 

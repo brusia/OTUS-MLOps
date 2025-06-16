@@ -111,7 +111,7 @@ resource "yandex_dataproc_cluster" "dataproc_cluster" {
     version_id = var.dataproc.version
 
     hadoop {
-      services = ["HDFS", "YARN", "SPARK"]
+      services = ["HDFS", "YARN", "SPARK", "TEZ", "HIVE"]
       properties = {
         "yarn:yarn.resourcemanager.am.max-attempts" = 5
       }

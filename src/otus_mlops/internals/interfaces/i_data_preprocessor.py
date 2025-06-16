@@ -6,7 +6,8 @@ from typing import Generic
 from otus_mlops.internals.interfaces._base import InputData
 
 
-class IDataPreprocessor(ABC, Generic[InputData, InputData]):
+# class IDataPreprocessor(ABC, Generic[InputData, OutputInputData]):
+class IDataPreprocessor(ABC):
     def __init__(self):
         super().__init__()
 

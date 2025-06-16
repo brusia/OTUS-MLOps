@@ -11,8 +11,13 @@ import os
 from pyspark.sql import SparkSession, DataFrame as SparkDataFrame
 from pyspark.sql.types import StructType, StructField, DoubleType, StringType, IntegerType, TimestampType
 from otus_mlops.internals.interfaces import CSV_EXTENSION, PARQUET_EXTENSION, TXT_EXTENSION, IDataLoader, LoadingMethod
+from otus_mlops.remote.object_storage_client import BUCKET_NAME, S3_ENDPOINT_URL
 import sys
+
 DEFAULT_DATA_DIR: Final[Path] = Path("/user/ubuntu/data")
+
+ACCESS_KEY_VARIABLE_NAME: Final[str] = "AWS_ACCESS_KEY_ID"
+SECRET_KEY_VARIABLE_NAME: Final[str] = "AWS_SECRET_ACCESS_KEY"
 
 import logging
 
@@ -32,16 +37,18 @@ class SparkRawDataLoader(IDataLoader[SparkDataFrame]):
             SparkSession
                 .builder
                 .appName("OTUS-MLOps")
-                .config("spark.sql.shuffle.partitions", "100") 
+                .config("spark.sql.shuffle.partitions", "1000") 
                 .config("spark.pyspark.python", "python3")
                 .config("spark.pyspark.driver.python",  "python3")
+                .config("spark.hadoop.fs.s3a.access.key", os.environ.get(ACCESS_KEY_VARIABLE_NAME))
+                .config("spark.hadoop.fs.s3a.secret.key", os.environ.get(SECRET_KEY_VARIABLE_NAME))
+                .config("spark.hadoop.fs.s3a.endpoint", S3_ENDPOINT_URL)
+                .config("spark.hadoop.fs.s3a.fast.upload", "true")
                 # .config("spark.pyspark.python", venv_python)
                 # .config("spark.pyspark.driver.python", venv_python)
                 # .config("spark.executorEnv.PYSPARK_PYTHON", venv_python)
                 .getOrCreate()
         )
-
-
     # spark.sparkContext.setLogLevel("ERROR")
 
     # @override
@@ -111,3 +118,16 @@ class SparkRawDataLoader(IDataLoader[SparkDataFrame]):
         #     except Exception:
         #         _logger.exception("File '%s' could not be loaded.", file_path.as_posix())
         #         continue
+
+    def upload_data(self, data_frame: SparkDataFrame, output_path: str):
+        data_frame.write.format("csv") \
+            .option("header", "true") \
+            .option("delimiter", ";") \
+            .save(f"s3a://{BUCKET_NAME}/{output_path}")
+
+    def upload_data(self, data_frame: pd.DataFrame, output_path: str):
+        spark_data_frame = self._spark.createDataFrame(data_frame)
+        self.upload_data(spark_data_frame, output_path)
+
+    def __del__(self):
+        self._spark.stop()
