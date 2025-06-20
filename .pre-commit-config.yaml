@@ -21,4 +21,14 @@ repos:
       - id: markdownlint
         stages: [pre-commit]
         exclude: (.gitlab/)
-  
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        stages: [pre-commit]
+        language: system
+        entry: pdm
+        pass_filenames: true
+        args: [run, python3, -m, mypy]
+        types_or: [python, pyi]
+        require_serial: true

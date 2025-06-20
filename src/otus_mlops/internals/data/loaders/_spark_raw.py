@@ -13,16 +13,16 @@ from pyspark.sql.types import StructType, StructField, DoubleType, StringType, I
 from otus_mlops.internals.interfaces import CSV_EXTENSION, PARQUET_EXTENSION, TXT_EXTENSION, IDataLoader, LoadingMethod
 from otus_mlops.remote.object_storage_client import BUCKET_NAME, S3_ENDPOINT_URL
 import sys
+import logging
+from logging import Logger
 
 DEFAULT_DATA_DIR: Final[Path] = Path("/user/ubuntu/data")
 
 ACCESS_KEY_VARIABLE_NAME: Final[str] = "AWS_ACCESS_KEY_ID"
 SECRET_KEY_VARIABLE_NAME: Final[str] = "AWS_SECRET_ACCESS_KEY"
 
-import logging
 
-
-_logger = logging.getLogger(__name__)
+_logger: Logger = logging.getLogger(__name__)
 
 
 class SparkRawDataLoader(IDataLoader[SparkDataFrame]):
@@ -34,62 +34,64 @@ class SparkRawDataLoader(IDataLoader[SparkDataFrame]):
 
         findspark.init()
         self._spark = (
-            SparkSession
-                .builder
-                .appName("OTUS-MLOps")
-                .config("spark.sql.shuffle.partitions", "1000") 
-                .config("spark.pyspark.python", "python3")
-                .config("spark.pyspark.driver.python",  "python3")
-                .config("spark.hadoop.fs.s3a.access.key", os.environ.get(ACCESS_KEY_VARIABLE_NAME))
-                .config("spark.hadoop.fs.s3a.secret.key", os.environ.get(SECRET_KEY_VARIABLE_NAME))
-                .config("spark.hadoop.fs.s3a.endpoint", S3_ENDPOINT_URL)
-                .config("spark.hadoop.fs.s3a.fast.upload", "true")
-                # .config("spark.pyspark.python", venv_python)
-                # .config("spark.pyspark.driver.python", venv_python)
-                # .config("spark.executorEnv.PYSPARK_PYTHON", venv_python)
-                .getOrCreate()
+            SparkSession.builder.appName("OTUS-MLOps")
+            .config("spark.sql.shuffle.partitions", "1000")
+            .config("spark.pyspark.python", "python3")
+            .config("spark.pyspark.driver.python", "python3")
+            .config("spark.hadoop.fs.s3a.access.key", os.environ.get(ACCESS_KEY_VARIABLE_NAME))
+            .config("spark.hadoop.fs.s3a.secret.key", os.environ.get(SECRET_KEY_VARIABLE_NAME))
+            .config("spark.hadoop.fs.s3a.endpoint", S3_ENDPOINT_URL)
+            .config("spark.hadoop.fs.s3a.fast.upload", "true")
+            # .config("spark.pyspark.python", venv_python)
+            # .config("spark.pyspark.driver.python", venv_python)
+            # .config("spark.executorEnv.PYSPARK_PYTHON", venv_python)
+            .getOrCreate()
         )
+
     # spark.sparkContext.setLogLevel("ERROR")
 
     # @override
     # TODO
-    def load(self,  data_dir: str | Path = DEFAULT_DATA_DIR, loading_method: LoadingMethod = LoadingMethod.OneByOne) -> Union[SparkDataFrame, Iterator[SparkDataFrame]]:
+    def load(
+        self, data_dir: str | Path = DEFAULT_DATA_DIR, loading_method: LoadingMethod = LoadingMethod.OneByOne
+    ) -> Union[SparkDataFrame, Iterator[SparkDataFrame]]:
         # print(data_dir)
-     #   data_path: Path
-      #  if isinstance(data_dir, Path) and data_dir.exists():
-       #     data_path = data_dir
+        #   data_path: Path
+        #  if isinstance(data_dir, Path) and data_dir.exists():
+        #     data_path = data_dir
         # print(data_path)
-       # elif isinstance(data_dir, str) and Path(data_dir).exists():
-       #     data_path = Path(data_dir)
+        # elif isinstance(data_dir, str) and Path(data_dir).exists():
+        #     data_path = Path(data_dir)
 
-     #   print(data_path)
+        #   print(data_path)
         data_path = data_dir
         if loading_method == LoadingMethod.FullDataset:
-                return self._load_full(data_path)
-        else: #  LoadingMethod.OneByOne:
+            return self._load_full(data_path)
+        else:  #  LoadingMethod.OneByOne:
             return self._load_one_by_one(data_path)
-
 
     def _load_full(self, data_path: Path) -> SparkDataFrame:
         frames: list[SparkDataFrame] = []
-        for (_, data_frame) in enumerate(self._load_one_by_one(data_path)):
+        for _, data_frame in enumerate(self._load_one_by_one(data_path)):
             frames.append(data_frame)
 
         return self._spark.union(*frames)
 
     # TODO: customized schema for unify the input data format
     def _load_one_by_one(self, data_path: Path) -> Iterator[SparkDataFrame]:
-        custom_schema = StructType([
-            StructField("transaction_id", IntegerType(), True),
-            StructField("tx_datetime", TimestampType(), True),
-            StructField("customer_id", IntegerType(), True),
-            StructField("terminal_id", IntegerType(), True),
-            StructField("tx_amount", DoubleType(), True),
-            StructField("tx_time_seconds", IntegerType(), True),
-            StructField("tx_time_days", IntegerType(), True),
-            StructField("tx_fraud", IntegerType(), True),
-            StructField("tx_fraud_scenario", IntegerType(), True)
-        ])
+        custom_schema = StructType(
+            [
+                StructField("transaction_id", IntegerType(), True),
+                StructField("tx_datetime", TimestampType(), True),
+                StructField("customer_id", IntegerType(), True),
+                StructField("terminal_id", IntegerType(), True),
+                StructField("tx_amount", DoubleType(), True),
+                StructField("tx_time_seconds", IntegerType(), True),
+                StructField("tx_time_days", IntegerType(), True),
+                StructField("tx_fraud", IntegerType(), True),
+                StructField("tx_fraud_scenario", IntegerType(), True),
+            ]
+        )
 
         # TODO: not one by one (!)
         frame = self._spark.read.csv(f"hdfs://{data_path.as_posix()}*", schema=custom_schema).dropna(how="all")
@@ -106,11 +108,11 @@ class SparkRawDataLoader(IDataLoader[SparkDataFrame]):
         #         else:
         #             _logger.warning("File format '%s' is not supported.", file_path)
         #             continue
-                
+
         #         if frame.isEmpty():
         #             _logger.warning("File '%s' does not contain data.", file_path)
         #             continue
-                
+
         #         _logger.debug("File '%s' was loaded succesfully.", file_path)
         #         yield frame
 
@@ -119,13 +121,18 @@ class SparkRawDataLoader(IDataLoader[SparkDataFrame]):
         #         _logger.exception("File '%s' could not be loaded.", file_path.as_posix())
         #         continue
 
-    def upload_data(self, data_frame: SparkDataFrame, output_path: str):
-        data_frame.write.format("csv") \
-            .option("header", "true") \
-            .option("delimiter", ";") \
-            .save(f"s3a://{BUCKET_NAME}/{output_path}")
+    def _upload_spark_data(self, data_frame: SparkDataFrame, output_path: str):
+        data_frame.write.format("csv").option("header", "true").option("delimiter", ";").save(
+            f"s3a://{BUCKET_NAME}/{output_path}"
+        )
 
-    def upload_data(self, data_frame: pd.DataFrame, output_path: str):
+    def upload_data(self, data_frame: Union[SparkDataFrame, pd.DataFrame], output_path: str):
+        if isinstance(data_frame, SparkDataFrame):
+            self._upload_spark_data(data_frame, output_path)
+        elif isinstance(data_frame, pd.DataFrame):
+            self._upload_pandas_data(data_frame, output_path)
+
+    def _upload_pandas_data(self, data_frame: pd.DataFrame, output_path: str):
         spark_data_frame = self._spark.createDataFrame(data_frame)
         self.upload_data(spark_data_frame, output_path)
 

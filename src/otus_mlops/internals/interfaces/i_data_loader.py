@@ -7,10 +7,10 @@ from strenum import StrEnum
 from otus_mlops.internals.interfaces._base import DataFrame
 
 
-
 CSV_EXTENSION: Final[str] = ".csv"
 TXT_EXTENSION: Final[str] = ".txt"
 PARQUET_EXTENSION: Final[str] = ".parquet"
+
 
 class LoadingMethod(StrEnum):
     FullDataset = auto()
@@ -22,5 +22,7 @@ class IDataLoader(ABC, Generic[DataFrame]):
         super().__init__()
 
     @abstractmethod
-    def load(self, data_dir: Union[str, Path], loading_method: LoadingMethod = LoadingMethod.OneByOne) -> Union[DataFrame, Iterator[DataFrame]]:
+    def load(
+        self, data_dir: Union[str, Path], loading_method: LoadingMethod = LoadingMethod.OneByOne
+    ) -> Union[DataFrame, Iterator[DataFrame]]:
         raise NotImplementedError

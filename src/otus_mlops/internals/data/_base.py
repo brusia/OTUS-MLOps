@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from datetime import date
 
+
 class TransactionInfo(BaseModel):
     id: int
     timestamp: date

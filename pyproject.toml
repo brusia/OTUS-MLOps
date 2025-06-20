@@ -16,6 +16,8 @@ dependencies = [
 [dependency-groups]
 data-analyse = [
     "evidently>=0.7.6",
+    "matplotlib>=3.7.5",
+    "ruptures>=1.1.9",
 ]
 # need at least 3.9 interpreter version
 # dev = [

@@ -156,6 +156,8 @@ fi
 # Создаем директорию для скриптов на прокси-машине
 log "Creating scripts directory on proxy machine"
 mkdir -p $HOME/scripts
+GIT_REPO=${git_repo}
+echo $GIT_REPO
 
 # Копируем скрипт dataproc_setup_script.sh на прокси-машину
 log "Copying dataproc_setup_script.sh script to proxy machine"
@@ -163,7 +165,7 @@ cat > $HOME/scripts/dataproc_setup_script.sh << 'EOL'
 ${dataproc_init_content}
 EOL
 sed -i "s/{{ s3_bucket }}/$${TARGET_BUCKET}\/data\/raw/g" $HOME/scripts/dataproc_setup_script.sh
-sed -i "s/{{ git_repo }}/${git_repo}/g" $HOME/scripts/dataproc_setup_script.sh
+sed -i "s/{{ git_repo }}/$${GIT_REPO}/g" $HOME/scripts/dataproc_setup_script.sh
 
 # Устанавливаем правильные разрешения для скрипта на прокси-машине
 log "Setting permissions for dataproc_setup_script.sh on proxy machine"
@@ -180,6 +182,15 @@ else
     log "Failed to connect to master node"
     exit 1
 fi
+
+
+# Настраиваем переменные для работы с s3 на dataproc
+# Настраиваем s3cmd
+log "Configuring storage credentials"
+ssh -i $HOME/.ssh/dataproc_key -o StrictHostKeyChecking=no $DATAPROC_HOST "echo 'export AWS_ACCESS_KEY_ID=${access_key}' >> .bashrc"
+ssh -i $HOME/.ssh/dataproc_key -o StrictHostKeyChecking=no $DATAPROC_HOST "echo 'export AWS_SECRET_ACCESS_KEY=${secret_key}' >> .bashrc"
+# ssh -i $HOME/.ssh/dataproc_key -o StrictHostKeyChecking=no $DATAPROC_HOST "source .bashrc"
+
 
 # Копируем скрипт dataproc_setup_script.sh с прокси-машины на мастер-ноду
 log "Create logs directory on dataproc master node"

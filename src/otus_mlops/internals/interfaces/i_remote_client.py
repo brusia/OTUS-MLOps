@@ -10,9 +10,9 @@ class IRemoteClient(ABC):
         super().__init__()
 
     @abstractmethod
-    def download_data(self, source_path: Union[str, Path], desctination_path: Union[str, Path]) -> bool:
+    def download_file(self, source_path: Union[str, Path], desctination_path: Union[str, Path]) -> bool:
         raise NotImplementedError
 
     @abstractmethod
-    def upload_data(self, source_path: Union[str, Path], desctination_path: Union[str, Path]) -> bool:
+    def upload_file(self, source_path: Union[str, Path], desctination_path: Union[str, Path]) -> bool:
         raise NotImplementedError
