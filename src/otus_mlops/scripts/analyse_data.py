@@ -9,20 +9,23 @@ from otus_mlops.internals.data.analysers import (
     SparkBaseStatisticsDataAnalyser,
     RupturesDataAnalyser,
 )
-from otus_mlops.internals.data.analysers import StatisticsTestDataAnalyser
-from otus_mlops.internals.interfaces import LoadingMethod, REPORT_PATH
+from otus_mlops.internals.data.analysers import StatisticalTestsDataAnalyser
+from otus_mlops.internals.data.analysers.evidently import (
+    REPORT_EXT as EVIDENTLY_REPORT_EXT,
+    SPLIT_PARTS_REPORT_NAME as EVIDENTLY_REPORT_NAME,
+    WHOLE_DATA_REPORT_NAME as EVIDENTLY_FULL_REPORT_NAME
+)
+from otus_mlops.internals.interfaces import LoadingMethod, REPORTS_PATH
 import pandas as pd
 
 import json
 import logging
 from otus_mlops.internals.data.loaders._spark_raw import SparkRawDataLoader
 from otus_mlops.internals.interfaces import IDataAnalyser
-from otus_mlops.remote.object_storage_client import ObjectStorageClient, BUCKET_NAME
 
 _logger = logging.getLogger(__name__)
 
-
-WORKING_DIR: Final[Path] = Path("data-analyse")
+BUCKET_NAME: Final[str] = "brusia-bucket"
 RAW_STATISTICS_FOLDER_NAME = Final[str] = "raw-statistics"
 BASE_STATISTICS_FILE_NAME: Final[Path] = Path("base_statistics.json")
 CORRELATION_MATRIX_FILE_NAME: Final[Path] = Path("correlations.csv")
@@ -30,6 +33,13 @@ HISTO_FILE_NAME: Final[Path] = Path("histo.csv")
 
 
 def analyse():
+    def _upload_file(s3: Any, file_name: Path):
+        s3.upload_file(
+            Filename=file_name.as_posix(),
+            Bucket=BUCKET_NAME,
+            Key=file_name.as_posix(),
+        )
+
     _logger.info("Initialize loader.")
     data_loader = SparkRawDataLoader()
 
@@ -39,7 +49,7 @@ def analyse():
     # data_analysers: list[IDataAnalyser] = []
     evidently_data_analyser = EvidentlyDataAnalyser()
     ruptures_data_analyser = RupturesDataAnalyser()
-    statistics_data_analyser = StatisticsTestDataAnalyser()
+    statistical_data_analyser = StatisticalTestsDataAnalyser()
 
     print("Data Schema")
     schema = DataDefinition(
@@ -103,41 +113,34 @@ def analyse():
 
     _logger.info("Run statistics tests for splitted parts.")
     for feature_name in test_data_statistics.histo:
-        statistics_analyser.analyse(test_data_statistics.histo[feature_name], ref_data_statistics.histo[feature_name])
-
-    _logger.info("Upload analyse results")
-    # data_loader.upload_data(res.base_stats,
-    data_loader.upload_data(
-        whole_data_base_stats.correlations,
-        WORKING_DIR.joinpath(RAW_STATISTICS_FOLDER_NAME, CORRELATION_MATRIX_FILE_NAME).as_posix(),
-    )
-    # data_loader.upload_data(res.base_stats, "data-analyse/base_statistics.csv")
-
-    with open("histo.json", "w") as f:
-        json.dump(whole_data_base_stats.histo, f)
-
-    with open("targets.json", "w") as f:
-        json.dump(whole_data_base_stats.targets, f)
+        statistical_data_analyser.analyse(test_data_statistics.histo[feature_name], ref_data_statistics.histo[feature_name], feature_name)
 
     _logger.info("Uploading results.")
+    data_loader.upload_data(
+        whole_data_base_stats.correlations,
+        REPORTS_PATH.joinpath(RAW_STATISTICS_FOLDER_NAME, CORRELATION_MATRIX_FILE_NAME).as_posix(),
+    )
+
     session = boto3.session.Session()
     s3 = session.client(service_name="s3", endpoint_url="https://storage.yandexcloud.net")
-    s3.upload_file(
-        Bucket=BUCKET_NAME,
-        Key=WORKING_DIR.joinpath(RAW_STATISTICS_FOLDER_NAME, HISTO_FILE_NAME).as_posix(),
-        Body=json.dumps(whole_data_base_stats.histo),
-    )
+
     s3.put_object(
         Bucket=BUCKET_NAME,
-        Key=WORKING_DIR.joinpath(RAW_STATISTICS_FOLDER_NAME, BASE_STATISTICS_FILE_NAME).as_posix(),
+        Key=REPORTS_PATH.joinpath(RAW_STATISTICS_FOLDER_NAME, HISTO_FILE_NAME).as_posix(),
+        Body=json.dumps(whole_data_base_stats.histo),
+    )
+
+    s3.put_object(
+        Bucket=BUCKET_NAME,
+        Key=REPORTS_PATH.joinpath(RAW_STATISTICS_FOLDER_NAME, BASE_STATISTICS_FILE_NAME).as_posix(),
         Body=json.dumps(whole_data_base_stats.base_stats),
     )
 
-    # storage_client.upload_file("targets.json", f"s3://{BUCKET_NAME}/data-analyse/targets.json")
-    # storage_client.upload_file(REPORT_PATH.absolute().joinpath(EVIDENTLY_REPORT_NAME), f"s3://{BUCKET_NAME}/data-analyse/{EVIDENTLY_REPORT_NAME}")
+    for item in REPORTS_PATH.rglob("*"):
+        if item.is_file:
+            _upload_file(s3, item.as_posix())
 
     _logger.info("Data analyse completed.")
-    print("Finished.")
 
 
 if __name__ == "__main__":

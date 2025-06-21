@@ -3,7 +3,7 @@ from .base_stats import SparkBaseStatisticsDataAnalyser
 from ._tf import TFDataAnalyser  # TBA.
 from .ruptures import RupturesDataAnalyser
 from .base_stats import BaseStatistics
-from .statistis import StatisticsTestDataAnalyser
+from .statisticals import StatisticalTestsDataAnalyser
 
 __all__ = ["EvidentlyDataAnalyser", "SparkBaseStatisticsDataAnalyser", "TFDataAnalyser", "RupturesDataAnalyser". "BaseStatistics",
-           "StatisticsTestDataAnalyser"]
+           "StatisticalTestsDataAnalyser"]

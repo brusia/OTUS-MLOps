@@ -2,7 +2,7 @@ from abc import ABC
 from pathlib import Path
 from typing import Final, Union  # , override
 import pandas as pd
-from otus_mlops.internals.interfaces import REPORT_PATH, IDataAnalyser
+from otus_mlops.internals.interfaces import REPORTS_PATH, IDataAnalyser
 import ruptures
 from ruptures import Pelt
 from strenum import StrEnum
@@ -20,7 +20,7 @@ class SegmentModelType(StrEnum):
 
 class RupturesDataAnalyser(IDataAnalyser[pd.DataFrame, None]):
     def __init__(self, report_dir: str = ""):
-        self._output_path = Path(report_dir) if report_dir else REPORT_PATH
+        self._output_path = Path(report_dir) if report_dir else REPORTS_PATH
 
     def analyse(
         self,
@@ -32,4 +32,4 @@ class RupturesDataAnalyser(IDataAnalyser[pd.DataFrame, None]):
         result = algo.predict(pen=PENALTY_VALUE)
 
         ruptures.display(data_frame, result, result, computed_chg_pts_linewidth=1)
-        pyplot.savefig(REPORT_PATH.joinpath("ruptures", Path(feature_name).joinpath(IMAGE_EXT)))
+        pyplot.savefig(REPORTS_PATH.joinpath("ruptures", Path(feature_name).joinpath(IMAGE_EXT)))

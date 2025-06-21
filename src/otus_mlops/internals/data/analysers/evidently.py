@@ -8,7 +8,7 @@ from evidently.ui.workspace import RemoteWorkspace  # type: ignore[import-untype
 from evidently import DataDefinition, Dataset, Report  # type: ignore[import-untyped, import-not-found]
 from evidently.presets import DataSummaryPreset  # type: ignore[import-untyped, import-not-found]
 
-from otus_mlops.internals.interfaces import REPORT_PATH, IDataAnalyser
+from otus_mlops.internals.interfaces import REPORTS_PATH, IDataAnalyser
 
 from evidently.metrics import (
     DriftedColumnsCount,
@@ -16,11 +16,12 @@ from evidently.metrics import (
 
 
 REPORT_EXT: Final[str] = ".html"
-
+SPLIT_PARTS_REPORT_NAME: Final[str] = "split_parts_report"
+WHOLE_DATA_REPORT_NAME: Final[str] = "whole_dataset"
 
 class EvidentlyDataAnalyser(IDataAnalyser[Dataset, None]):
     def __init__(self, report_dir: str = ""):
-        self._output_path = Path(report_dir) if report_dir else REPORT_PATH
+        self._output_path = Path(report_dir) if report_dir else REPORTS_PATH
 
     def analyse(self, dataset: Dataset, ref: Union[Dataset, None] = None) -> None:
         report = Report(
@@ -30,7 +31,7 @@ class EvidentlyDataAnalyser(IDataAnalyser[Dataset, None]):
 
         snapshot = report.run(dataset, ref)
 
-        report_name = "split_parts_report" if ref else "whole_dataset"
-        report_path = REPORT_PATH.absolute().joinpath(Path(report_name).with_suffix(REPORT_EXT))
+        report_name = SPLIT_PARTS_REPORT_NAME if ref else WHOLE_DATA_REPORT_NAME
+        report_path = REPORTS_PATH.joinpath(Path(report_name).with_suffix(REPORT_EXT))
         report_path.parent.mkdir(parents=True, exist_ok=True)
         snapshot.save_html(report_path.as_posix())

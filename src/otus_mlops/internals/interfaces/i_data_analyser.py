@@ -5,7 +5,7 @@ from typing import Any, Final, Generic
 from otus_mlops.internals.interfaces.base import AnalyserInputData, AnalyserOutputData
 
 
-REPORT_PATH: Final[Path] = Path("reports")
+REPORTS_PATH: Final[Path] = Path("data-analyse")
 
 
 class IDataAnalyser(ABC, Generic[AnalyserInputData, AnalyserOutputData]):
