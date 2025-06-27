@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Final
+from typing import Final, Any
 from pyspark.sql import functions as F
 from evidently import DataDefinition, Dataset, BinaryClassification, MulticlassClassification
 import boto3
@@ -26,7 +26,7 @@ from otus_mlops.internals.interfaces import IDataAnalyser
 _logger = logging.getLogger(__name__)
 
 BUCKET_NAME: Final[str] = "brusia-bucket"
-RAW_STATISTICS_FOLDER_NAME = Final[str] = "raw-statistics"
+RAW_STATISTICS_FOLDER_NAME: Final[str] = "raw-statistics"
 BASE_STATISTICS_FILE_NAME: Final[Path] = Path("base_statistics.json")
 CORRELATION_MATRIX_FILE_NAME: Final[Path] = Path("correlations.csv")
 HISTO_FILE_NAME: Final[Path] = Path("histo.csv")

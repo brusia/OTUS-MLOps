@@ -1,11 +1,13 @@
+
+
 from abc import ABC, abstractmethod
 from typing import Generic
 
-from otus_mlops.internals.interfaces._base import AnalyserInputData, DataFrame
+from otus_mlops.internals.interfaces.base import AnalyserInputData, DataFrame
 
 
 class IDataPreprocessor(ABC, Generic[AnalyserInputData, DataFrame]):
-    # class IDataPreprocessor(ABC):
+# class IDataPreprocessor(ABC):
     def __init__(self):
         super().__init__()
 

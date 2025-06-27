@@ -11,7 +11,6 @@ import os
 from pyspark.sql import SparkSession, DataFrame as SparkDataFrame
 from pyspark.sql.types import StructType, StructField, DoubleType, StringType, IntegerType, TimestampType
 from otus_mlops.internals.interfaces import CSV_EXTENSION, PARQUET_EXTENSION, TXT_EXTENSION, IDataLoader, LoadingMethod
-from otus_mlops.remote.object_storage_client import BUCKET_NAME, S3_ENDPOINT_URL
 import sys
 import logging
 from logging import Logger
@@ -20,6 +19,9 @@ DEFAULT_DATA_DIR: Final[Path] = Path("/user/ubuntu/data")
 
 ACCESS_KEY_VARIABLE_NAME: Final[str] = "AWS_ACCESS_KEY_ID"
 SECRET_KEY_VARIABLE_NAME: Final[str] = "AWS_SECRET_ACCESS_KEY"
+
+BUCKET_NAME: Final[str] = "brusia-bucket"
+S3_ENDPOINT_URL: Final[str] = "https://storage.yandexcloud.net"
 
 
 _logger: Logger = logging.getLogger(__name__)
@@ -35,7 +37,7 @@ class SparkRawDataLoader(IDataLoader[SparkDataFrame]):
         findspark.init()
         self._spark = (
             SparkSession.builder.appName("OTUS-MLOps")
-            .config("spark.sql.shuffle.partitions", "1000")
+            # .config("spark.sql.shuffle.partitions", "1000")
             .config("spark.pyspark.python", "python3")
             .config("spark.pyspark.driver.python", "python3")
             .config("spark.hadoop.fs.s3a.access.key", os.environ.get(ACCESS_KEY_VARIABLE_NAME))

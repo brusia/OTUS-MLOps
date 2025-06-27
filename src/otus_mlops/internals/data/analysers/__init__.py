@@ -5,5 +5,4 @@ from .ruptures import RupturesDataAnalyser
 from .base_stats import BaseStatistics
 from .statisticals import StatisticalTestsDataAnalyser
 
-__all__ = ["EvidentlyDataAnalyser", "SparkBaseStatisticsDataAnalyser", "TFDataAnalyser", "RupturesDataAnalyser". "BaseStatistics",
-           "StatisticalTestsDataAnalyser"]
+__all__ = ["EvidentlyDataAnalyser", "SparkBaseStatisticsDataAnalyser", "TFDataAnalyser", "RupturesDataAnalyser", "BaseStatistics", "StatisticalTestsDataAnalyser"]

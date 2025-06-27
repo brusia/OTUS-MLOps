@@ -53,11 +53,9 @@ pip install uv
 git clone {{ git_repo }}
 cd OTUS-MLOps
 git checkout hometask_3
-echo "before export"
-source .bashrc
-uv venv --system-site-packages
-uv sync --group data-analyse
-uv pip install -e .
+python3 -m uv venv --system-site-packages
+python3 -m uv sync --group data-analyse
+python3 -m uv pip install -e .
 
 
 # export PATH=/home/ubuntu/.local/bin/uv:$PATH
@@ -65,8 +63,8 @@ uv pip install -e .
 # uv sync --group data-analyse
 # uv pip install -e .
 
-uv run src/otus_mlops/scripts/analyse_data.py
-uv run src/otus_mlops/scripts/clean_data.py
+# uv run src/otus_mlops/scripts/analyse_data.py
+# uv run src/otus_mlops/scripts/clean_data.py
 
 # hadoop distcp "s3a://brusia-bucket/data/raw/2019-08-22.txt" /user/ubuntu/data/2019-08-22.txt
 # hadoop distcp "s3a://brusia-bucket/data/raw/2020-05-18.txt" /user/ubuntu/data/2020-05-18.txt

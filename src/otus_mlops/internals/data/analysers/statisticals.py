@@ -19,8 +19,10 @@ REPORT_NAME: Final[str] = "statistical_tests.log"
 # TODO: unify internal functions
 class StatisticalTestsDataAnalyser(IDataAnalyser[pd.DataFrame, None]):
     def __init__(self, report_dir: str = ""):
-        _logger.addHandler(FileHandler(REPORTS_PATH.joinpath(REPORT_NAME)))
-        self._output_path = Path(report_dir) if report_dir else REPORTS_PATH
+        self._output_path = Path(report_dir) or REPORTS_PATH
+        self._output_path.mkdir(parents=True, exist_ok=True)
+
+        _logger.addHandler(FileHandler(self._output_path.joinpath(REPORT_NAME)))
 
     def analyse(self, test_data: pd.DataFrame, ref_data: pd.DataFrame, feature_name: str) -> None:
         _logger.info("Analyse feature '%s'", feature_name)
