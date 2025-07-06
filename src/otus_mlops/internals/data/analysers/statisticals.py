@@ -2,11 +2,9 @@
 from abc import ABC
 from pathlib import Path
 from typing import Final, Union
-import pandas as pd
-
+from pyspark.sql import DataFrame as SparkDataFrame
 from otus_mlops.internals.interfaces import REPORTS_PATH, IDataAnalyser
 from logging import Logger, FileHandler
-from scipy.stats import shapiro, mannwhitneyu, levene, ttest_ind
 
 import logging
 
@@ -16,15 +14,14 @@ _logger: Logger = logging.getLogger(__name__)
 REPORT_NAME: Final[str] = "statistical_tests.log"
 
 
-# TODO: unify internal functions
-class StatisticalTestsDataAnalyser(IDataAnalyser[pd.DataFrame, None]):
+class StatisticalTestsDataAnalyser(IDataAnalyser[SparkDataFrame, None]):
     def __init__(self, report_dir: str = ""):
         self._output_path = Path(report_dir) or REPORTS_PATH
         self._output_path.mkdir(parents=True, exist_ok=True)
 
         _logger.addHandler(FileHandler(self._output_path.joinpath(REPORT_NAME)))
 
-    def analyse(self, test_data: pd.DataFrame, ref_data: pd.DataFrame, feature_name: str) -> None:
+    def analyse(self, test_data: SparkDataFrame, ref_data: SparkDataFrame, feature_name: str) -> None:
         _logger.info("Analyse feature '%s'", feature_name)
 
         _logger.info("Run Shapiro-test for test_data")
@@ -46,7 +43,8 @@ class StatisticalTestsDataAnalyser(IDataAnalyser[pd.DataFrame, None]):
             _logger.info("Run Mann-Whitneyu-test")
             self._mann_whitneyu_test(test_data, ref_data)
 
-    def _shapiro_test(self, data_frame: pd.DataFrame) -> bool:
+
+    def _shapiro_test(self, data_frame: SparkDataFrame) -> bool:
         res = shapiro(data_frame.values)
         _logger.info("Shapiro stat is %s, p-value = %s", res.statistic, res.pvalue)
 
@@ -57,7 +55,7 @@ class StatisticalTestsDataAnalyser(IDataAnalyser[pd.DataFrame, None]):
             _logger.warning("p-value = %s < 0.05, distribution is NOT normal")
             return False
 
-    def _t_student_test(self, test_data: pd.DataFrame, ref_data: pd.DataFrame) -> bool:
+    def _t_student_test(self, test_data: SparkDataFrame, ref_data: SparkDataFrame) -> bool:
         res = ttest_ind(test_data, ref_data)
 
         _logger.info("t-Student stat is %s, p-value = %s", res.statistic, res.pvalue)
@@ -69,7 +67,7 @@ class StatisticalTestsDataAnalyser(IDataAnalyser[pd.DataFrame, None]):
             _logger.warning("p-value = %s < 0.05, distribution are DIFFERENT")
             return False
 
-    def _levene_test(self, test_data: pd.DataFrame, ref_data: pd.DataFrame,) -> bool:
+    def _levene_test(self, test_data: SparkDataFrame, ref_data: SparkDataFrame) -> bool:
         res = levene(test_data, ref_data)
 
         _logger.info("Levene stat is %s, p-value = %s", res.statistic, res.pvalue)
@@ -82,7 +80,7 @@ class StatisticalTestsDataAnalyser(IDataAnalyser[pd.DataFrame, None]):
             return False
         
 
-    def _mann_whitneyu_test(self, test_data: pd.DataFrame, ref_data: pd.DataFrame,) -> bool:
+    def _mann_whitneyu_test(self, test_data: SparkDataFrame, ref_data: SparkDataFrame,) -> bool:
         res = mannwhitneyu(test_data.values, ref_data.values)
         _logger.info("Mann-Whitneyu stat is %s, p-value = %s", res.statistic, res.pvalue)
 
@@ -93,9 +91,9 @@ class StatisticalTestsDataAnalyser(IDataAnalyser[pd.DataFrame, None]):
             _logger.warning("p-value = %s < 0.05, distribution are DIFFERENT")
             return False
 
-    def _kolmokorov_smirnov_test(self, test_data: pd.DataFrame, ref_data: pd.DataFrame,) -> bool:
+    def _kolmokorov_smirnov_test(self, test_data: SparkDataFrame, ref_data: SparkDataFrame,) -> bool:
         raise NotImplementedError
 
-    def _population_stability_test(self, test_data: pd.DataFrame, ref_data: pd.DataFrame,) -> bool:
+    def _population_stability_test(self, test_data: SparkDataFrame, ref_data: SparkDataFrame,) -> bool:
         raise NotImplementedError
 

@@ -13,12 +13,12 @@ class BaseStatistics:
     # categorical_stats: pd.DataFrame
     correlations: pd.DataFrame
     # targets: Dict[str, SparkDataFrame]
-    histo: Dict[str, pd.DataFrame]
+    # histo: Dict[str, pd.DataFrame]
 
-    def get_pandas_histo(self) -> pd.DataFrame:
-        return pd.DataFrame({column: value for column, value in self.histo.items()})
+    # def get_pandas_histo(self) -> pd.DataFrame:
+    #     return pd.DataFrame({column: value for column, value in self.histo.items()})
 
 
 DataFrame = TypeVar("DataFrame", pd.DataFrame, SparkDataFrame)
-AnalyserInputData = TypeVar("AnalyserInputData", pd.DataFrame, Dataset)
+AnalyserInputData = TypeVar("AnalyserInputData", pd.DataFrame, Dataset, SparkDataFrame)
 AnalyserOutputData = TypeVar("AnalyserOutputData", BaseStatistics, None)

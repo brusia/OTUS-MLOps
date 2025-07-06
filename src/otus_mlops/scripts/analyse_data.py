@@ -41,18 +41,75 @@ def analyse():
         )
 
     _logger.info("Initialize loader.")
-    data_loader = SparkRawDataLoader()
+    with SparkRawDataLoader() as data_loader:
+        _logger.info("Initialize data analysers.")
+        base_data_analyser = SparkBaseStatisticsDataAnalyser()
 
-    _logger.info("Initialize data analysers.")
-    base_data_analyser = SparkBaseStatisticsDataAnalyser(bins_count=30)
+        evidently_data_analyser = EvidentlyDataAnalyser()
+        ruptures_data_analyser = RupturesDataAnalyser()
+        statistical_data_analyser = StatisticalTestsDataAnalyser()
 
-    # data_analysers: list[IDataAnalyser] = []
-    evidently_data_analyser = EvidentlyDataAnalyser()
-    ruptures_data_analyser = RupturesDataAnalyser()
-    statistical_data_analyser = StatisticalTestsDataAnalyser()
+        print("load data")
+        dataset = data_loader.load()
+        print(dataset.schema)
 
-    print("Data Schema")
-    schema = DataDefinition(
+        print("analyse")
+
+        print(dataset.show(5))
+        whole_data_base_stats = base_data_analyser.analyse(dataset)
+
+        # Choose data splitted reference and test data (70% for reference, 30% for split)
+        min_date = F.unix_timestamp("tx_datetime").agg({"tx_datetime": "min"}).collect()[0][0]
+        max_date = F.unix_timestamp("tx_datetime").agg({"tx_datetime": "max"}).collect()[0][0]
+        splitted_date = F.from_unixtime(min_date + (max_date - min_date) * 0.7).cast("timestamp")
+
+        ref_data = dataset.filter(F.col("tx_datetime") < splitted_date)
+        test_data = dataset.filter(F.col("tx_datetime") >= splitted_date)
+
+        # chech for debug
+        print("ref data datas")
+        ref_data.agg(F.min("tx_datetime").alias("min_date"), 
+                    F.max("tx_datetime").alias("max_date")).show()
+        
+        print("test data datas")
+        test_data.agg(F.min("tx_datetime").alias("min_date"), 
+                    F.max("tx_datetime").alias("max_date")).show()
+
+        ref_data_statistics = base_data_analyser.analyse(ref_data)
+        test_data_statistics = base_data_analyser.analyse(test_data)
+
+        print("base statistics")
+        print(whole_data_base_stats.base_stats)
+
+        print("ref statistics")
+        print(ref_data_statistics.base_stats)
+
+        print("test statistics")
+        print(test_data_statistics.base_stats)
+
+        print("Feature correlations (whole)")
+        print(whole_data_base_stats.correlations)
+
+        print("ref correlations (whole)")
+        print(ref_data_statistics.correlations)
+
+        print("test correlations (whole)")
+        print(test_data_statistics.correlations)
+
+        # pandas_data = dataset.limit(10000).withColumn("tx_datetime", F.col("tx_datetime").cast('string')).toPandas()
+        # pandas_data["tx_datetime"] = pd.to_datetime(pandas_data["tx_datetime"], errors='coerce')
+        # print(pandas_data.head(n=5).to_string(index=False))
+
+        # _logger.info("Run statistics tests for splitted parts (whole dataset).")
+        # for feature_name in test_data:
+        #     statistical_data_analyser.analyse(test_data[feature_name], ref_data[feature_name], feature_name)
+
+        ref_data_sampled_pandas: pd.DataFrame = ref_data.sample(n=10000, random_state=42).toPandas()
+        test_data_sampled_pandas: pd.DataFrame = test_data.sample(n=1000, random_state=42).toPandas()
+
+        whole_data_samples_pandas: pd.DataFrame = dataset.sample(n=100000, random_state=42).toPandas()
+
+        schema = DataDefinition(
         numerical_columns=[
             "transaction_id",
             "customer_id",
@@ -64,83 +121,56 @@ def analyse():
             "tx_fraud_scenario",
         ],
         classification=[  # BinaryClassification(id="binary",target = "tx_fraud", prediction_labels = "prediction", prediction_probas = ["tx_amount",  "terminal_id"]),
-            MulticlassClassification(
-                id="multi",
-                target="tx_fraud_scenario",
-                prediction_labels="prediction",
-                prediction_probas=["tx_amount", "terminal_id"],
-            )
-        ],
-    )
-    print(schema)
+                MulticlassClassification(
+                    id="multi",
+                    target="tx_fraud_scenario",
+                    prediction_labels="prediction",
+                    prediction_probas=["tx_amount", "terminal_id"],
+                )
+            ],
+        )
 
-    print("load data")
-    dataset = data_loader.load()
-    print(dataset.schema)
+        _logger.info("Run evdently analyser for whole dataset.")
+        evidently_data_analyser.analyse(
+            dataset=Dataset.from_pandas(data=whole_data_samples_pandas, data_definition=schema)
+        )
 
-    print("analyse")
+        _logger.info("Run evdently analyser for splitted parts.")
+        evidently_data_analyser.analyse(
+            dataset=Dataset.from_pandas(data=test_data_sampled_pandas, data_definition=schema),
+            ref=Dataset.from_pandas(data=ref_data_sampled_pandas, data_definition=schema),
+        )
 
-    print(dataset.show(5))
-    whole_data_base_stats = base_data_analyser.analyse(dataset)
-    ref_data, test_data = dataset.randomSplit([0.5, 0.5], seed=42)
-    ref_data_statistics = base_data_analyser.analyse(ref_data)
-    test_data_statistics = base_data_analyser.analyse(test_data)
+        _logger.info("Run ruptures analyser.")
+        for feature_name in dataset.columns:
+            ruptures_data_analyser.analyse(whole_data_samples_pandas[[feature_name]], feature_name=feature_name)
 
-    print("base statistics")
-    print(whole_data_base_stats.base_stats.show())
+        _logger.info("Uploading results.")
+        data_loader.upload_data(
+            whole_data_base_stats.correlations,
+            REPORTS_PATH.joinpath(RAW_STATISTICS_FOLDER_NAME, CORRELATION_MATRIX_FILE_NAME).as_posix(),
+        )
 
-    print("Feature correlations")
-    print(whole_data_base_stats.correlations)
+        session = boto3.session.Session()
+        s3 = session.client(service_name="s3", endpoint_url="https://storage.yandexcloud.net")
 
-    # pandas_data = dataset.limit(10000).withColumn("tx_datetime", F.col("tx_datetime").cast('string')).toPandas()
-    # pandas_data["tx_datetime"] = pd.to_datetime(pandas_data["tx_datetime"], errors='coerce')
-    # print(pandas_data.head(n=5).to_string(index=False))
+        # s3.put_object(
+        #     Bucket=BUCKET_NAME,
+        #     Key=REPORTS_PATH.joinpath(RAW_STATISTICS_FOLDER_NAME, HISTO_FILE_NAME).as_posix(),
+        #     Body=json.dumps(whole_data_base_stats.histo),
+        # )
 
-    _logger.info("Run evdently analyser for whole dataset.")
-    evidently_data_analyser.analyse(
-        dataset=Dataset.from_pandas(data=whole_data_base_stats.get_pandas_histo(), data_definition=schema)
-    )
+        s3.put_object(
+            Bucket=BUCKET_NAME,
+            Key=REPORTS_PATH.joinpath(RAW_STATISTICS_FOLDER_NAME, BASE_STATISTICS_FILE_NAME).as_posix(),
+            Body=json.dumps(whole_data_base_stats.base_stats),
+        )
 
-    _logger.info("Run evdently analyser for splitted parts.")
-    evidently_data_analyser.analyse(
-        dataset=Dataset.from_pandas(data=test_data_statistics.get_pandas_histo(), data_definition=schema),
-        ref=Dataset.from_pandas(data=ref_data_statistics.get_pandas_histo(), data_definition=schema),
-    )
+        for item in REPORTS_PATH.rglob("*"):
+            if item.is_file:
+                _upload_file(s3, item.as_posix())
 
-    _logger.info("Run ruptures analyser.")
-    for feature_name in whole_data_base_stats.histo:
-        ruptures_data_analyser.analyse(whole_data_base_stats.histo[feature_name], feature_name=feature_name)
-
-    _logger.info("Run statistics tests for splitted parts.")
-    for feature_name in test_data_statistics.histo:
-        statistical_data_analyser.analyse(test_data_statistics.histo[feature_name], ref_data_statistics.histo[feature_name], feature_name)
-
-    _logger.info("Uploading results.")
-    data_loader.upload_data(
-        whole_data_base_stats.correlations,
-        REPORTS_PATH.joinpath(RAW_STATISTICS_FOLDER_NAME, CORRELATION_MATRIX_FILE_NAME).as_posix(),
-    )
-
-    session = boto3.session.Session()
-    s3 = session.client(service_name="s3", endpoint_url="https://storage.yandexcloud.net")
-
-    s3.put_object(
-        Bucket=BUCKET_NAME,
-        Key=REPORTS_PATH.joinpath(RAW_STATISTICS_FOLDER_NAME, HISTO_FILE_NAME).as_posix(),
-        Body=json.dumps(whole_data_base_stats.histo),
-    )
-
-    s3.put_object(
-        Bucket=BUCKET_NAME,
-        Key=REPORTS_PATH.joinpath(RAW_STATISTICS_FOLDER_NAME, BASE_STATISTICS_FILE_NAME).as_posix(),
-        Body=json.dumps(whole_data_base_stats.base_stats),
-    )
-
-    for item in REPORTS_PATH.rglob("*"):
-        if item.is_file:
-            _upload_file(s3, item.as_posix())
-
-    _logger.info("Data analyse completed.")
+        _logger.info("Data analyse completed.")
 
 
 if __name__ == "__main__":
