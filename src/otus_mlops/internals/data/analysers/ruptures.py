@@ -11,6 +11,8 @@ from matplotlib import pyplot
 IMAGE_EXT: Final[str] = ".png"
 PENALTY_VALUE: Final[int] = 3
 
+PATH_NAME: Final[str] = "ruptures"
+
 
 class SegmentModelType(StrEnum):
     LeastAbsolute = "l1"
@@ -21,6 +23,7 @@ class SegmentModelType(StrEnum):
 class RupturesDataAnalyser(IDataAnalyser[pd.DataFrame, None]):
     def __init__(self, report_dir: str = ""):
         self._output_path = Path(report_dir) if report_dir else REPORTS_PATH
+        REPORTS_PATH.joinpath(PATH_NAME).mkdir(parents=True, exist_ok=True)
 
     def analyse(
         self,
@@ -28,8 +31,9 @@ class RupturesDataAnalyser(IDataAnalyser[pd.DataFrame, None]):
         feature_name: str,
         model: SegmentModelType = SegmentModelType.RadialBasisFunction,
     ) -> None:
+        
         algo = Pelt(model=model.value).fit(data_frame)
         result = algo.predict(pen=PENALTY_VALUE)
 
         ruptures.display(data_frame, result, result, computed_chg_pts_linewidth=1)
-        pyplot.savefig(REPORTS_PATH.joinpath("ruptures", Path(feature_name).joinpath(IMAGE_EXT)))
+        pyplot.savefig(REPORTS_PATH.joinpath(PATH_NAME, Path(feature_name).with_suffix(IMAGE_EXT)))

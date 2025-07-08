@@ -16,14 +16,6 @@ import sys
 import logging
 from logging import Logger
 
-DEFAULT_DATA_DIR: Final[Path] = Path("/user/ubuntu/data")
-
-ACCESS_KEY_VARIABLE_NAME: Final[str] = "AWS_ACCESS_KEY_ID"
-SECRET_KEY_VARIABLE_NAME: Final[str] = "AWS_SECRET_ACCESS_KEY"
-
-BUCKET_NAME: Final[str] = "brusia-bucket"
-S3_ENDPOINT_URL: Final[str] = "https://storage.yandexcloud.net"
-
 
 _logger: Logger = logging.getLogger(__name__)
 

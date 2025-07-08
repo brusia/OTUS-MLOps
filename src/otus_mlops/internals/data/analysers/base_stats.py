@@ -34,13 +34,11 @@ class SparkBaseStatisticsDataAnalyser(IDataAnalyser[SparkDataFrame, BaseStatisti
         ]
 
         base_stats: Dict[str, Dict[str, float | int]] = {}
-        histo: Dict[str, List[float]] = {}
+        # histo: Dict[str, List[float]] = {}
 
         for field_name in field_names:
             base_stats[field_name] = self._calculate_base_statistics(data_frame, field_name)
-            # histo[field_name] = self._calculate_distributions(data_frame, field_name)
 
-        # categorical_stats = self._calculate_categorical_stats(data_frame)
         correlations = self._calculate_correlations(data_frame, field_names)
 
         return BaseStatistics(

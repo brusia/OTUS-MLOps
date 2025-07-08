@@ -1,10 +1,19 @@
-from typing import Dict, TypeVar, Union
+from pathlib import Path
+from typing import Dict, Final, TypeVar, Union
 from evidently import Dataset
 from pyspark.sql import DataFrame as SparkDataFrame
 import pandas as pd
 
 from dataclasses import dataclass
 
+
+DEFAULT_DATA_DIR: Final[Path] = Path("/user/ubuntu/data")
+
+ACCESS_KEY_VARIABLE_NAME: Final[str] = "AWS_ACCESS_KEY_ID"
+SECRET_KEY_VARIABLE_NAME: Final[str] = "AWS_SECRET_ACCESS_KEY"
+
+BUCKET_NAME: Final[str] = "brusia-bucket"
+S3_ENDPOINT_URL: Final[str] = "https://storage.yandexcloud.net"
 
 # TODO: update fields with data classes
 @dataclass

@@ -24,8 +24,12 @@ class EvidentlyDataAnalyser(IDataAnalyser[Dataset, None]):
         self._output_path = Path(report_dir) if report_dir else REPORTS_PATH
 
     def analyse(self, dataset: Dataset, ref: Union[Dataset, None] = None) -> None:
+        metrics = [DataSummaryPreset()]
+        if ref:
+            metrics.append(DriftedColumnsCount())
+
         report = Report(
-            metrics=[DataSummaryPreset(), DriftedColumnsCount()],
+            metrics=metrics,
             include_tests="True",
         )
 
