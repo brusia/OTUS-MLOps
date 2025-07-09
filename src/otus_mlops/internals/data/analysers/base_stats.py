@@ -65,20 +65,20 @@ class SparkBaseStatisticsDataAnalyser(IDataAnalyser[SparkDataFrame, BaseStatisti
         duplicates_count = total - unique
         duplicates_ratio = duplicates_count / total if total > 0 else 0.0
 
-        print("stats:")
+        print(f"stats for column '{column_name}':")
         print(stats)
 
         return {
-            "mean": float(stats["mean"]),
-            "std": float(stats["std"]),
-            "min": float(stats["min"]),
-            "max": float(stats["max"]),
-            "median": float(stats["median"]),
-            "25percentile": float(stats["25percentile"]),
-            "75percentile": float(stats["75percentile"]),
-            "skewness": float(stats["skewness"]),
-            "kurtosis": float(stats["kurtosis"]),
-            "missing_ratio": float(stats["missing_ratio"]),
+            "mean": float(stats["mean"]) if stats["mean"] else None,
+            "std": float(stats["std"]) if stats["std"] else None,
+            "min": float(stats["min"]) if stats["min"] else None,
+            "max": float(stats["max"]) if stats["max"] else None,
+            "median": float(stats["median"]) if stats["median"] else None,
+            "25percentile": float(stats["25percentile"]) if stats["25percentile"] else None,
+            "75percentile": float(stats["75percentile"]) if stats["75percentile"] else None,
+            "skewness": float(stats["skewness"]) if stats["skewness"] else None,
+            "kurtosis": float(stats["kurtosis"]) if stats["kurtosis"] else None,
+            "missing_ratio": float(stats["missing_ratio"]) if stats["missing_ratio"] else None,
             "duplicates_ratio": duplicates_ratio,
         }
 

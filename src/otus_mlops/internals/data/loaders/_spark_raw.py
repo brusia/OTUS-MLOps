@@ -16,6 +16,8 @@ import sys
 import logging
 from logging import Logger
 
+from otus_mlops.internals.interfaces.base import ACCESS_KEY_VARIABLE_NAME, BUCKET_NAME, DEFAULT_DATA_DIR, S3_ENDPOINT_URL, SECRET_KEY_VARIABLE_NAME
+
 
 _logger: Logger = logging.getLogger(__name__)
 

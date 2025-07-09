@@ -7,6 +7,7 @@ import pandas as pd
 from dataclasses import dataclass
 
 
+PREPROCESS_DATA_MODEL_PATH: Final[Path] = Path("models/data_preprocess")
 DEFAULT_DATA_DIR: Final[Path] = Path("/user/ubuntu/data")
 
 ACCESS_KEY_VARIABLE_NAME: Final[str] = "AWS_ACCESS_KEY_ID"
@@ -14,6 +15,15 @@ SECRET_KEY_VARIABLE_NAME: Final[str] = "AWS_SECRET_ACCESS_KEY"
 
 BUCKET_NAME: Final[str] = "brusia-bucket"
 S3_ENDPOINT_URL: Final[str] = "https://storage.yandexcloud.net"
+
+NUMERICAL_COLUMNS = [ "transaction_id",
+                    "customer_id",
+                    "terminal_id",
+                    "tx_amount",
+                    "tx_time_seconds",
+                    "tx_time_days",
+                    "tx_fraud",
+                    "tx_fraud_scenario"]
 
 # TODO: update fields with data classes
 @dataclass

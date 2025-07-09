@@ -1,104 +1,25 @@
-from pyspark.sql import functions as F
-from evidently import DataDefinition, Dataset, BinaryClassification, MulticlassClassification
-import boto3
-from otus_mlops.internals.data.analysers import EvidentlyDataAnalyser, EVIDENTLY_REPORT_NAME
-from otus_mlops.internals.data.analysers import SparkBaseStatisticsDataAnalyser
-from otus_mlops.internals.interfaces import LoadingMethod, REPORTS_PATH
-import pandas as pd
+from typing import Final
+from pyspark.ml.feature import MinMaxScaler, VectorAssembler, StandardScaler
+from pyspark.ml import Pipeline
 
-import json
 from otus_mlops.internals.data.loaders._spark_raw import SparkRawDataLoader
-from otus_mlops.remote.object_storage_client import ObjectStorageClient, BUCKET_NAME
+from otus_mlops.internals.data.preprocess._fraud_data_preprocessor import FraudDataProcessor
+from otus_mlops.internals.interfaces.base import BUCKET_NAME
+from otus_mlops.scripts.analyse_data import NUMERICAL_COLUMNS
+
+OUTPUT_DATA_PATH: Final[str] = "data/processed/data.parquet"
+PARTITIONS_COUNT = 10000
 
 
-def analyse():
-    print("init loader")
-    data_loader = SparkRawDataLoader()
+def preprocess():
+    with SparkRawDataLoader() as data_loader:
+        dataset = data_loader.load()
+        preprocessor = FraudDataProcessor()
 
-    print("init analysers")
-    spark_data_preprocessor = SparkBaseStatisticsDataAnalyser(target_columns=["tx_fraud", "tx_fraud_scenario"])
-    evidently_data_analyser = EvidentlyDataAnalyser()
+        processed_data = preprocessor.preprocess(dataset)
 
-
-    print("Data Schema")
-    # TODO: unify for different data
-    schema = DataDefinition(
-        numerical_columns=[
-            "transaction_id",
-            "customer_id",
-            "terminal_id",
-            "tx_amount",
-            "tx_time_seconds",
-            "tx_time_days",
-            "tx_fraud",
-            "tx_fraud_scenario",
-        ],
-        classification=[  # BinaryClassification(id="binary",target = "tx_fraud", prediction_labels = "prediction", prediction_probas = ["tx_amount",  "terminal_id"]),
-            MulticlassClassification(
-                id="multi",
-                target="tx_fraud_scenario",
-                prediction_labels="prediction",
-                prediction_probas=["tx_amount", "terminal_id"],
-            )
-        ],
-    )
-    print(schema)
-
-    print("load data")
-    dataset = data_loader.load()
-    print(dataset.schema)
-
-    print("analyse")
-
-    print(dataset.show(5))
-    res = spark_data_analyser.analyse(dataset)
-
-    print("base statistics")
-    # print(len(res.base_stats))
-    print(res.base_stats.show())
-
-    # print("categorical statistics")
-    # print(len(res.categorical_stats))
-    # print(res.categorical_stats.head(n=10).to_string(index=False))
-
-    print("Feature correlations")
-    print(res.correlations)
-
-    print("Targets")
-    for target in res.targets:
-        print(res.targets[target].show(10))
-
-    pandas_data = dataset.limit(10000).withColumn("tx_datetime", F.col("tx_datetime").cast("string")).toPandas()
-    pandas_data["tx_datetime"] = pd.to_datetime(pandas_data["tx_datetime"], errors="coerce")
-    print(pandas_data.head(n=5).to_string(index=False))
-    # print(pandas_data.isnull().sum())
-
-    evidently_data_analyser.analyse(
-        dataset=Dataset.from_pandas(data=pandas_data.iloc[:5000], data_definition=schema),
-        ref=Dataset.from_pandas(data=pandas_data.iloc[5000:], data_definition=schema),
-    )
-
-    print("uploading")
-    data_loader.upload_data(res.base_stats, "data-analyse/base_statistics.csv")
-    data_loader.upload_data(res.correlations, "data-analyse/correlations.csv")
-    # data_loader.upload_data(res.base_stats, "data-analyse/base_statistics.csv")
-
-    with open("histo.json", "w") as f:
-        json.dump(res.histo, f)
-
-    with open("targets.json", "w") as f:
-        json.dump(res.targets, f)
-
-    session = boto3.session.Session()
-    s3 = session.client(service_name="s3", endpoint_url="https://storage.yandexcloud.net")
-    s3.upload_file("histo.json", BUCKET_NAME, "data-analyse/histo.json")
-    s3.put_object(Bucket=BUCKET_NAME, Key="data-analyse/target.json", Body=json.dumps(res.targets))
-
-    # storage_client.upload_file("targets.json", f"s3://{BUCKET_NAME}/data-analyse/targets.json")
-    # storage_client.upload_file(REPORT_PATH.absolute().joinpath(EVIDENTLY_REPORT_NAME), f"s3://{BUCKET_NAME}/data-analyse/{EVIDENTLY_REPORT_NAME}")
-
-    print("Finished.")
+        processed_data.repartition(PARTITIONS_COUNT).write.parquet(f"s3a://{BUCKET_NAME}/{OUTPUT_DATA_PATH}")
 
 
 if __name__ == "__main__":
-    analyse()
+    preprocess()

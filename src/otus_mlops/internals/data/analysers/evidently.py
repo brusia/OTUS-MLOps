@@ -36,6 +36,6 @@ class EvidentlyDataAnalyser(IDataAnalyser[Dataset, None]):
         snapshot = report.run(dataset, ref)
 
         report_name = SPLIT_PARTS_REPORT_NAME if ref else WHOLE_DATA_REPORT_NAME
-        report_path = REPORTS_PATH.joinpath(Path(report_name).with_suffix(REPORT_EXT))
+        report_path = self._output_path.joinpath("evidently", Path(report_name).with_suffix(REPORT_EXT))
         report_path.parent.mkdir(parents=True, exist_ok=True)
         snapshot.save_html(report_path.as_posix())
