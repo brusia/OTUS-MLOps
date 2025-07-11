@@ -5,6 +5,7 @@ from strenum import StrEnum
 from pathlib import Path
 from typing import Final, Iterator, Union
 
+import pyarrow.fs as fs
 import tqdm
 import pandas as pd
 import findspark
@@ -63,8 +64,26 @@ class SparkRawDataLoader(IDataLoader[SparkDataFrame], AbstractContextManager):
                 StructField("tx_fraud_scenario", IntegerType(), True),
             ]
         )
-        frame = self._spark.read.csv(f"hdfs://{data_dir.as_posix()}*", schema=custom_schema).dropna(how="all")
-        return frame
+        data_dir = Path(data_dir)
+        if not data_dir.exists:
+            data_dir = DEFAULT_DATA_DIR
+ 
+        if loading_method == LoadingMethod.OneByOne:
+            # Path = self._spark.sparkContext._jvm.org.apache.hadoop.fs.Path
+            # FileSystem = 
+            # Path = self._spark.sparkContext._jvm.org.apache.hadoop.fs.Path
+            fs = self._spark.sparkContext._jvm.org.apache.hadoop.fs.FileSystem.get(self._spark.sparkContext._jsc.hadoopConfiguration())
+            # print(self._spark.sparkContext._jvm.org.apache.hadoop.fs.Path(data_dir.as_posix()))
+            for status in fs.listStatus(self._spark.sparkContext._jvm.org.apache.hadoop.fs.Path(data_dir.as_posix())):
+                filename = Path(status.getPath().toString())
+                print(filename)
+                print(filename.stem)
+                print(filename.name)
+                yield (f"{filename.stem}", self._spark.read.csv(f"hdfs://{data_dir.joinpath(filename.name).as_posix()}", schema=custom_schema).dropna(how="all"))
+        elif loading_method == LoadingMethod.FullDataset:
+            return ("full_data", self._spark.read.csv(f"hdfs://{data_dir.as_posix()}*", schema=custom_schema).dropna(how="all"))
+        else:
+            raise RuntimeError("Loading method must be specify.")
 
     def upload_data(self, data_frame: Union[SparkDataFrame, pd.DataFrame], output_path: str):
         if isinstance(data_frame, SparkDataFrame):
@@ -73,7 +92,7 @@ class SparkRawDataLoader(IDataLoader[SparkDataFrame], AbstractContextManager):
             self._upload_pandas_data(data_frame, output_path)
 
     def _upload_spark_data(self, data_frame: SparkDataFrame, output_path: str):
-        data_frame.write.format("csv").option("header", "true").option("delimiter", ";").save(
+        data_frame.write.format("parquet").save(
             f"s3a://{BUCKET_NAME}/{output_path}"
         )
 

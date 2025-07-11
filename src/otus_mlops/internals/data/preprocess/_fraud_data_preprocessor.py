@@ -3,16 +3,16 @@ from typing import Dict, Final, List, Tuple, Union
 from pyspark.sql import DataFrame as SparkDataFrame
 from otus_mlops.internals.interfaces import IDataPreprocessor
 from pyspark.ml.feature import MinMaxScaler, VectorAssembler, StandardScaler
-from pyspark.ml import Pipeline
+from pyspark.ml import Pipeline, PipelineModel
 
-from otus_mlops.internals.interfaces.base import NUMERICAL_COLUMNS
+from otus_mlops.internals.interfaces.base import NUMERICAL_COLUMNS, PREPROCESS_DATA_MODEL_PATH
 
 
 
 class FraudDataProcessor(IDataPreprocessor[SparkDataFrame, SparkDataFrame]):
     def __init__(self, model_path: Union[Path, None] = None):
         self._model_path = model_path if model_path else PREPROCESS_DATA_MODEL_PATH
-        self._model = Pipeline.read().load(model_path) if model_path and model_path.exists() else None
+        self._model =  PipelineModel.load(model_path) if model_path and model_path.exists() else None
 
     def fit_model(self, input_data: SparkDataFrame, numeric_columns: List[str]) -> None:
         """
@@ -36,7 +36,6 @@ class FraudDataProcessor(IDataPreprocessor[SparkDataFrame, SparkDataFrame]):
         )
 
         self._pipeline = Pipeline(stages=[assembler, scaler])
-
         
         model = self._pipeline.fit(input_data)
         model.write().overwrite().save(self._model_path)

@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Final, Any
+from typing import Final, Any, Union
 from pyspark.sql import functions as F
 from evidently import DataDefinition, Dataset, BinaryClassification, MulticlassClassification
 import boto3
@@ -42,6 +42,10 @@ TEST_DATA_SAMPLES_COUNT: Final[int] = 1000
 REF_DATA_SAMPLE_COUNT: Final[int] = 10000
 FULL_DATA_SAMPLES_COUNT: Final[int] = 100000
 
+OUTPUT_DATA_PATH: Final[str] = "data/processed/"
+DATA_EXTENSION: Final[str] = ".parquet"
+PARTITIONS_COUNT = 10000
+
 # TEST_DATA_SAMPLES_COUNT: Final[int] = 10
 # REF_DATA_SAMPLE_COUNT: Final[int] = 100
 # FULL_DATA_SAMPLES_COUNT: Final[int] = 100
@@ -57,16 +61,12 @@ def analyse(evidently: bool = False, ruptures: bool = False, statistics: bool = 
             Key=file_name.as_posix(),
         )
 
-    def _convert_to_pandas(dataframe: SparkDataFrame, num_samples: int) -> pd.DataFrame:
-        # print(dataframe.show(5))
-        # print(num_samples)
-        # print(TIME_COLUMN_NAME)
-        # print("convert to pandas")
-        pd_data_frame: pd.DataFrame = dataframe.limit(num_samples).withColumn(TIME_COLUMN_NAME, F.col(TIME_COLUMN_NAME).cast('string')).toPandas()
-        # print("partly converted:")
-        # print(pd_data_frame.head(n=5).to_string(index=False))
+    def _convert_to_pandas(dataframe: SparkDataFrame, num_samples: int = 0) -> pd.DataFrame:
+        if num_samples > 0:
+            dataframe: pd.DataFrame = dataframe.limit(num_samples)
+
+        pd_data_frame: pd.DataFrame = dataframe.withColumn(TIME_COLUMN_NAME, F.col(TIME_COLUMN_NAME).cast('string')).toPandas()
         pd_data_frame[TIME_COLUMN_NAME] = pd.to_datetime(pd_data_frame[TIME_COLUMN_NAME], errors='coerce')
-        # print(pd_data_frame.head(n=5).to_string(index=False))
         return pd_data_frame
 
     _logger.info("Initialize loader.")
@@ -75,146 +75,117 @@ def analyse(evidently: bool = False, ruptures: bool = False, statistics: bool = 
 
     with SparkRawDataLoader() as data_loader:
         _logger.info("Initialize data analysers.")
-        base_data_analyser = SparkBaseStatisticsDataAnalyser()
-
-        statistical_data_analyser = StatisticalTestsDataAnalyser()
 
         print("load data")
-        dataset = data_loader.load()
-        print(dataset.schema)
+        ref_data: Union[SparkDataFrame, None] = None
+        ref_data_pandas: Union[pd.DataFrame, None] = None
+        for data_name, dataset in data_loader.load():
+            # data_name, dataset = data.items()
+            
+            dataset = dataset.limit(100)
+            # print(dataset.schema)
 
-        print("dataset")
-        print(dataset.show(5))
+            print("dataset")
+            print(dataset.show(5))
 
-         # Choose data splitted reference and test data (70% for reference, 30% for split)
-        min_date = dataset.agg(F.min(F.unix_timestamp(TIME_COLUMN_NAME))).collect()[0][0]
-        max_date = dataset.agg(F.max(F.unix_timestamp(TIME_COLUMN_NAME))).collect()[0][0]
-        splitted_date = F.from_unixtime(F.lit(min_date + (max_date - min_date) * 0.7)).cast("timestamp")
+            # data_name = dataset.collect()[1][0]
+            print(data_name)
 
-        ref_data = dataset.filter(F.col(TIME_COLUMN_NAME) < splitted_date)
-        test_data = dataset.filter(F.col(TIME_COLUMN_NAME) >= splitted_date)
+            print(dataset.show(5))
+            print(ref_data)
+            print(ref_data_pandas)
 
-        if ruptures or evidently or statistics:
-            ref_data_sampled_pandas = _convert_to_pandas(ref_data, REF_DATA_SAMPLE_COUNT)
-            test_data_sampled_pandas = _convert_to_pandas(test_data, TEST_DATA_SAMPLES_COUNT)
-            whole_data_samples_pandas = _convert_to_pandas(dataset, FULL_DATA_SAMPLES_COUNT) 
+            if ruptures or evidently or statistics:
+                data_pandas = _convert_to_pandas(dataset)
 
-            # print("ref data pandas")
-            # print(ref_data_sampled_pandas.head(5))
+            if statistics:
+                base_data_analyser = SparkBaseStatisticsDataAnalyser()
+                statistical_data_analyser = StatisticalTestsDataAnalyser()
+                base_statistics = base_data_analyser.analyse(dataset)
 
-            # print("test data pandas")
-            # print(test_data_sampled_pandas.head(5))
+                s3.put_object(
+                    Bucket=BUCKET_NAME,
+                    Key=REPORTS_PATH.joinpath(data_name, RAW_STATISTICS_FOLDER_NAME, BASE_STATISTICS_FILE_NAME.as_posix()).as_posix(),
+                    Body=json.dumps(base_statistics.base_stats),
+                )
 
-            # print("full data pandas")
-            # print(whole_data_samples_pandas.head(5))
+                s3.put_object(
+                    Bucket=BUCKET_NAME,
+                    Key=REPORTS_PATH.joinpath(data_name, RAW_STATISTICS_FOLDER_NAME, CORRELATION_MATRIX_FILE_NAME.as_posix()).as_posix(),
+                    Body=base_statistics.correlations.to_json(),
+                )
 
-        if statistics:
-        # dataset = dataset.limit(1000)
-            whole_data_base_stats = base_data_analyser.analyse(dataset)
-
-            ref_data_statistics = base_data_analyser.analyse(ref_data)
-            test_data_statistics = base_data_analyser.analyse(test_data)
-
-            for data_name, data in {"full_dataset_": whole_data_base_stats, "test_samples_": test_data_statistics, "ref_samples_": ref_data_statistics}.items():
-            s3.put_object(
-                Bucket=BUCKET_NAME,
-                Key=REPORTS_PATH.joinpath(RAW_STATISTICS_FOLDER_NAME, data_name + BASE_STATISTICS_FILE_NAME.as_posix()).as_posix(),
-                Body=json.dumps(data.base_stats),
-            )
-
-            s3.put_object(
-                Bucket=BUCKET_NAME,
-                Key=REPORTS_PATH.joinpath(RAW_STATISTICS_FOLDER_NAME, data_name + CORRELATION_MATRIX_FILE_NAME.as_posix()).as_posix(),
-                Body=data.correlations.to_json(),
-            )
+                _logger.info("Run statistics tests for splitted parts (whole dataset).")
+                if ref_data_pandas:
+                    for feature_name in NUMERICAL_COLUMNS:
+                        statistical_data_analyser.analyse(data_pandas[[feature_name]], ref_data_pandas[[feature_name]], feature_name)
 
 
-        # print("base statistics")
-        # print(whole_data_base_stats.base_stats)
+            print("tx_fraud estimated")
+            print(dataset.groupBy("tx_fraud").count().show())
 
-        # print("ref statistics")
-        # print(ref_data_statistics.base_stats)
+            print("tx_fraud scenario estimated")
+            print(dataset.groupBy("tx_fraud_scenario").count().show())
 
-        # print("test statistics")
-        # print(test_data_statistics.base_stats)
+            if evidently:
+                evidently_data_analyser = EvidentlyDataAnalyser()
+                schema = DataDefinition(
+                        numerical_columns=NUMERICAL_COLUMNS,
+                        datetime_columns=[TIME_COLUMN_NAME],
+                        classification=[
+                        BinaryClassification(name="binary", target = "tx_fraud", prediction_labels="prediction"),
+                                MulticlassClassification(
+                                        name="multi",
+                                        target="tx_fraud_scenario",
+                                        prediction_labels="prediction",
+                                    )
+                                ]
+                            )
 
-        # print("Feature correlations (whole)")
-        # print(whole_data_base_stats.correlations)
+                _logger.info("Run evdently analyser for whole dataset.")
+                evidently_data_analyser.analyse(
+                    dataset=Dataset.from_pandas(data=data_pandas, data_definition=schema),
+                )
 
-        # print("ref correlations (whole)")
-        # print(ref_data_statistics.correlations)
+                if ref_data_pandas:
+                    _logger.info("Run evdently analyser for splitted parts.")
+                    evidently_data_analyser.analyse(
+                        dataset=Dataset.from_pandas(data=data_pandas, data_definition=schema),
+                        ref=Dataset.from_pandas(data=ref_data_pandas, data_definition=schema),
+                    )
 
-        # print("test correlations (whole)")
-        # print(test_data_statistics.correlations)
+            if ruptures:
+                ruptures_data_analyser = RupturesDataAnalyser()
+                _logger.info("Run ruptures analyser.")
+                for feature_name in dataset.columns:
+                    if feature_name == TIME_COLUMN_NAME:
+                        continue
+                    ruptures_data_analyser.analyse(data_pandas[[feature_name]], feature_name=feature_name)
 
-            _logger.info("Run statistics tests for splitted parts (whole dataset).")
-            for feature_name in NUMERICAL_COLUMNS:
-                # print(f"feature: {feature_name}")
-                # print("test data")
-                # print(test_data_sampled_pandas[feature_name].head(5))
+            for item in REPORTS_PATH.rglob("*"):
+                print(item)
+                if Path(item).is_file():
+                    _upload_file(s3, item)
 
-                # print("ref data")
-                # print(ref_data_sampled_pandas[feature_name].head(5))
-                statistical_data_analyser.analyse(test_data_sampled_pandas[[feature_name]], ref_data_sampled_pandas[[feature_name]], feature_name)
+            _logger.info("Data analyse completed.")
 
+            if ref_data:
+                _logger.info("Start data preprocessing.")
+                pipe_processor = FraudDataProcessor()
+                pipe_processor.fit_model(ref_data, NUMERICAL_COLUMNS)
 
-        print("tx_fraud estimated")
-        print(dataset.groupBy("tx_fraud").count().show())
+                for item in PREPROCESS_DATA_MODEL_PATH.rglob("*"):
+                    print(item)
+                    if Path(item).is_file():
+                        _upload_file(s3, item)
 
-        print("tx_fraud scenario estimated")
-        print(dataset.groupBy("tx_fraud_scenario").count().show())
+                _logger.info("Data analyse completed.")
 
-        if evidently:
-            evidently_data_analyser = EvidentlyDataAnalyser()
-            schema = DataDefinition(
-                    numerical_columns=NUMERICAL_COLUMNS,
-                    datetime_columns=[TIME_COLUMN_NAME],
-                    classification=[
-                    BinaryClassification(name="binary", target = "tx_fraud", prediction_labels="prediction"),
-                            MulticlassClassification(
-                                    name="multi",
-                                    target="tx_fraud_scenario",
-                                    prediction_labels="prediction",
-                                )
-                            ]
-                        )
-
-            _logger.info("Run evdently analyser for whole dataset.")
-            evidently_data_analyser.analyse(
-                dataset=Dataset.from_pandas(data=whole_data_samples_pandas, data_definition=schema),
-            )
-
-            _logger.info("Run evdently analyser for splitted parts.")
-            evidently_data_analyser.analyse(
-                dataset=Dataset.from_pandas(data=test_data_sampled_pandas, data_definition=schema),
-                ref=Dataset.from_pandas(data=ref_data_sampled_pandas, data_definition=schema),
-            )
-
-        if ruptures:
-            ruptures_data_analyser = RupturesDataAnalyser()
-            _logger.info("Run ruptures analyser.")
-            for feature_name in dataset.columns:
-                if feature_name == TIME_COLUMN_NAME:
-                    continue
-                ruptures_data_analyser.analyse(whole_data_samples_pandas[[feature_name]], feature_name=feature_name)
-
-        for item in REPORTS_PATH.rglob("*"):
-            print(item)
-            if Path(item).is_file():
-                _upload_file(s3, item)
-
-        _logger.info("Data analyse completed.")
-
-        _logger.info("Start data preprocessing.")
-        pipe_processor = FraudDataProcessor()
-        pipe_processor.fit_model(ref_data, NUMERICAL_COLUMNS)
-
-        for item in PREPROCESS_DATA_MODEL_PATH.rglob("*"):
-            print(item)
-            if Path(item).is_file():
-                _upload_file(s3, item)
-
-        _logger.info("Data analyse completed.")
+                processed_data: SparkDataFrame = pipe_processor.preprocess(dataset)
+                processed_data.repartition(PARTITIONS_COUNT).write.parquet(f"s3a://{BUCKET_NAME}/{OUTPUT_DATA_PATH}/{data_name}{DATA_EXTENSION}")
+            
+            ref_data = dataset
+            ref_data_pandas = data_pandas
 
 if __name__ == "__main__":
     analyse(evidently=True, ruptures=True, statistics=True)
