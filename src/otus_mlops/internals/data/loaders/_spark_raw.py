@@ -3,10 +3,10 @@ from contextlib import AbstractContextManager
 from enum import auto
 from strenum import StrEnum
 from pathlib import Path
-from typing import Final, Iterator, Union
+from typing import Final, Iterator, Tuple, Union
 
-import pyarrow.fs as fs
-import tqdm
+# import pyarrow.fs as fs
+# import tqdm
 import pandas as pd
 import findspark
 import os
@@ -16,6 +16,7 @@ from otus_mlops.internals.interfaces import CSV_EXTENSION, PARQUET_EXTENSION, TX
 import sys
 import logging
 from logging import Logger
+import pyspark.sql.functions as F
 
 from otus_mlops.internals.interfaces.base import ACCESS_KEY_VARIABLE_NAME, BUCKET_NAME, DEFAULT_DATA_DIR, S3_ENDPOINT_URL, SECRET_KEY_VARIABLE_NAME
 
@@ -26,31 +27,24 @@ _logger: Logger = logging.getLogger(__name__)
 class SparkRawDataLoader(IDataLoader[SparkDataFrame], AbstractContextManager):
     def __enter__(self):
         venv_python = os.path.join(os.path.dirname(sys.executable), "python")
-        # os.environ["PYARROW_IGNORE_INIT"] = "yes"
-        # os.environ["PYSPARK_PYTHON"] = venv_python
-        # os.environ["PYSPARK_DRIVER_PYTHON"] = venv_python
 
         findspark.init()
         self._spark = (
             SparkSession.builder.appName("OTUS-MLOps")
-            # .config("spark.sql.shuffle.partitions", "1000")
             .config("spark.pyspark.python", "python3")
             .config("spark.pyspark.driver.python", "python3")
             .config("spark.hadoop.fs.s3a.access.key", os.environ.get(ACCESS_KEY_VARIABLE_NAME))
             .config("spark.hadoop.fs.s3a.secret.key", os.environ.get(SECRET_KEY_VARIABLE_NAME))
             .config("spark.hadoop.fs.s3a.endpoint", S3_ENDPOINT_URL)
-            .config("spark.hadoop.fs.s3a.fast.upload", "true")
-            # .config("spark.pyspark.python", venv_python)
-            # .config("spark.pyspark.driver.python", venv_python)
-            # .config("spark.executorEnv.PYSPARK_PYTHON", venv_python)
             .getOrCreate()
         )
+
         return super().__enter__()
-    # @override
+
     # TODO: make schema customized
     def load(
         self, data_dir: str | Path = DEFAULT_DATA_DIR, loading_method: LoadingMethod = LoadingMethod.OneByOne
-    ) -> Union[SparkDataFrame, Iterator[SparkDataFrame]]:
+    ) -> Union[Tuple[str,SparkDataFrame], Iterator[Tuple[str,SparkDataFrame]]]:
         custom_schema = StructType(
             [
                 StructField("transaction_id", IntegerType(), True),
@@ -69,17 +63,22 @@ class SparkRawDataLoader(IDataLoader[SparkDataFrame], AbstractContextManager):
             data_dir = DEFAULT_DATA_DIR
  
         if loading_method == LoadingMethod.OneByOne:
-            # Path = self._spark.sparkContext._jvm.org.apache.hadoop.fs.Path
-            # FileSystem = 
-            # Path = self._spark.sparkContext._jvm.org.apache.hadoop.fs.Path
             fs = self._spark.sparkContext._jvm.org.apache.hadoop.fs.FileSystem.get(self._spark.sparkContext._jsc.hadoopConfiguration())
-            # print(self._spark.sparkContext._jvm.org.apache.hadoop.fs.Path(data_dir.as_posix()))
             for status in fs.listStatus(self._spark.sparkContext._jvm.org.apache.hadoop.fs.Path(data_dir.as_posix())):
                 filename = Path(status.getPath().toString())
-                print(filename)
-                print(filename.stem)
-                print(filename.name)
-                yield (f"{filename.stem}", self._spark.read.csv(f"hdfs://{data_dir.joinpath(filename.name).as_posix()}", schema=custom_schema).dropna(how="all"))
+    
+            # Добавим колонку с датой без времени
+            dataset = self._spark.read.csv(f"hdfs://{data_dir.joinpath(filename.name).as_posix()}", schema=custom_schema).dropna(how="all")
+            dataset = dataset.withColumn("date_col", F.to_date("tx_datetime"))
+
+            # Получим список уникальных дат
+            dates = sorted([row['date_only'] for row in dataset.select("date_only").distinct().collect()])
+
+            # Создаем генератор, который по очереди возвращает DataFrame за каждый день
+            for date in dates:
+                print(date)
+                yield (date, dataset.filter(f"'date_only'= '{date}'"))
+
         elif loading_method == LoadingMethod.FullDataset:
             return ("full_data", self._spark.read.csv(f"hdfs://{data_dir.as_posix()}*", schema=custom_schema).dropna(how="all"))
         else:
@@ -92,6 +91,8 @@ class SparkRawDataLoader(IDataLoader[SparkDataFrame], AbstractContextManager):
             self._upload_pandas_data(data_frame, output_path)
 
     def _upload_spark_data(self, data_frame: SparkDataFrame, output_path: str):
+        print(data_frame.show(5))
+        print(f"s3a://{BUCKET_NAME}/{output_path}")
         data_frame.write.format("parquet").save(
             f"s3a://{BUCKET_NAME}/{output_path}"
         )

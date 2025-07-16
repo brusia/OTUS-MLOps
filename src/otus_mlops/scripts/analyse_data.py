@@ -1,4 +1,5 @@
 from pathlib import Path
+import shutil
 from typing import Final, Any, Union
 from pyspark.sql import functions as F
 from evidently import DataDefinition, Dataset, BinaryClassification, MulticlassClassification
@@ -42,8 +43,8 @@ TEST_DATA_SAMPLES_COUNT: Final[int] = 1000
 REF_DATA_SAMPLE_COUNT: Final[int] = 10000
 FULL_DATA_SAMPLES_COUNT: Final[int] = 100000
 
-OUTPUT_DATA_PATH: Final[str] = "data/processed/"
-DATA_EXTENSION: Final[str] = ".parquet"
+OUTPUT_DATA_PATH: Final[Path] = Path("data/processed/")
+# DATA_EXTENSION: Final[str] = ".parquet"
 PARTITIONS_COUNT = 10000
 
 # TEST_DATA_SAMPLES_COUNT: Final[int] = 10
@@ -51,14 +52,15 @@ PARTITIONS_COUNT = 10000
 # FULL_DATA_SAMPLES_COUNT: Final[int] = 100
 
 
+
 ITERATIONS_COUNT: Final[int] = 10
 
 def analyse(evidently: bool = False, ruptures: bool = False, statistics: bool = False):
-    def _upload_file(s3: Any, file_name: Path):
+    def _upload_file(s3: Any, file_name: Path, destination: Union[Path, None] = None):
         s3.upload_file(
             Filename=file_name.as_posix(),
             Bucket=BUCKET_NAME,
-            Key=file_name.as_posix(),
+            Key=destination.as_posix() if destination else file_name.as_posix(),
         )
 
     def _convert_to_pandas(dataframe: SparkDataFrame, num_samples: int = 0) -> pd.DataFrame:
@@ -74,6 +76,9 @@ def analyse(evidently: bool = False, ruptures: bool = False, statistics: bool = 
     s3 = boto3.session.Session().client(service_name="s3", endpoint_url=S3_ENDPOINT_URL)
 
     with SparkRawDataLoader() as data_loader:
+
+        # rdd = data_loader._spark.sparkContext.parallelize(["test", "123", "hello"])
+        # rdd.saveAsTextFile(f"s3a://{BUCKET_NAME}/test/test.txt")
         _logger.info("Initialize data analysers.")
 
         print("load data")
@@ -82,7 +87,7 @@ def analyse(evidently: bool = False, ruptures: bool = False, statistics: bool = 
         for data_name, dataset in data_loader.load():
             # data_name, dataset = data.items()
             
-            dataset = dataset.limit(100)
+            # dataset = dataset.limit(100).cache()
             # print(dataset.schema)
 
             print("dataset")
@@ -116,9 +121,9 @@ def analyse(evidently: bool = False, ruptures: bool = False, statistics: bool = 
                 )
 
                 _logger.info("Run statistics tests for splitted parts (whole dataset).")
-                if ref_data_pandas:
+                if ref_data_pandas is not None:
                     for feature_name in NUMERICAL_COLUMNS:
-                        statistical_data_analyser.analyse(data_pandas[[feature_name]], ref_data_pandas[[feature_name]], feature_name)
+                        statistical_data_analyser.analyse(data_pandas[feature_name], ref_data_pandas[feature_name], feature_name, data_name)
 
 
             print("tx_fraud estimated")
@@ -145,13 +150,15 @@ def analyse(evidently: bool = False, ruptures: bool = False, statistics: bool = 
                 _logger.info("Run evdently analyser for whole dataset.")
                 evidently_data_analyser.analyse(
                     dataset=Dataset.from_pandas(data=data_pandas, data_definition=schema),
+                    data_name=data_name
                 )
 
-                if ref_data_pandas:
+                if ref_data_pandas is not None:
                     _logger.info("Run evdently analyser for splitted parts.")
                     evidently_data_analyser.analyse(
                         dataset=Dataset.from_pandas(data=data_pandas, data_definition=schema),
                         ref=Dataset.from_pandas(data=ref_data_pandas, data_definition=schema),
+                        data_name=data_name
                     )
 
             if ruptures:
@@ -160,7 +167,7 @@ def analyse(evidently: bool = False, ruptures: bool = False, statistics: bool = 
                 for feature_name in dataset.columns:
                     if feature_name == TIME_COLUMN_NAME:
                         continue
-                    ruptures_data_analyser.analyse(data_pandas[[feature_name]], feature_name=feature_name)
+                    ruptures_data_analyser.analyse(data_pandas[[feature_name]], feature_name=feature_name, data_name=data_name)
 
             for item in REPORTS_PATH.rglob("*"):
                 print(item)
@@ -169,20 +176,31 @@ def analyse(evidently: bool = False, ruptures: bool = False, statistics: bool = 
 
             _logger.info("Data analyse completed.")
 
-            if ref_data:
+            if ref_data is not None:
                 _logger.info("Start data preprocessing.")
                 pipe_processor = FraudDataProcessor()
-                pipe_processor.fit_model(ref_data, NUMERICAL_COLUMNS)
+                pipe_processor.fit_model(ref_data, NUMERICAL_COLUMNS, data_name)
 
-                for item in PREPROCESS_DATA_MODEL_PATH.rglob("*"):
-                    print(item)
+                for item in Path("/tmp").joinpath(PREPROCESS_DATA_MODEL_PATH).rglob("*"):
+                    print(item.relative_to(Path("/tmp")))
                     if Path(item).is_file():
-                        _upload_file(s3, item)
+                        _upload_file(s3, item, item.relative_to(Path("/tmp")))
 
                 _logger.info("Data analyse completed.")
 
                 processed_data: SparkDataFrame = pipe_processor.preprocess(dataset)
-                processed_data.repartition(PARTITIONS_COUNT).write.parquet(f"s3a://{BUCKET_NAME}/{OUTPUT_DATA_PATH}/{data_name}{DATA_EXTENSION}")
+                print("finish proprocess:")
+                print(processed_data.show(5))
+                processed_data.write.parquet(f"file:///tmp/{OUTPUT_DATA_PATH.joinpath(data_name)}")
+
+                for item in Path("/tmp").joinpath(OUTPUT_DATA_PATH, data_name).rglob("*"):
+                    print(item.relative_to(Path("/tmp")))
+                    if Path(item).is_file():
+                        _upload_file(s3, item, item.relative_to(Path("/tmp")))
+
+                shutil.rmtree(Path("/tmp").joinpath(OUTPUT_DATA_PATH, data_name))
+                shutil.rmtree(Path("/tmp").joinpath(PREPROCESS_DATA_MODEL_PATH))
+                shutil.rmtree(REPORTS_PATH.joinpath(data_name))
             
             ref_data = dataset
             ref_data_pandas = data_pandas

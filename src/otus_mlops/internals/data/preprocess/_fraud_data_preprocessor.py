@@ -5,8 +5,7 @@ from otus_mlops.internals.interfaces import IDataPreprocessor
 from pyspark.ml.feature import MinMaxScaler, VectorAssembler, StandardScaler
 from pyspark.ml import Pipeline, PipelineModel
 
-from otus_mlops.internals.interfaces.base import NUMERICAL_COLUMNS, PREPROCESS_DATA_MODEL_PATH
-
+from otus_mlops.internals.interfaces.base import BUCKET_NAME, NUMERICAL_COLUMNS, PREPROCESS_DATA_MODEL_PATH
 
 
 class FraudDataProcessor(IDataPreprocessor[SparkDataFrame, SparkDataFrame]):
@@ -14,7 +13,7 @@ class FraudDataProcessor(IDataPreprocessor[SparkDataFrame, SparkDataFrame]):
         self._model_path = model_path if model_path else PREPROCESS_DATA_MODEL_PATH
         self._model =  PipelineModel.load(model_path) if model_path and model_path.exists() else None
 
-    def fit_model(self, input_data: SparkDataFrame, numeric_columns: List[str]) -> None:
+    def fit_model(self, input_data: SparkDataFrame, numeric_columns: List[str], data_name: str) -> None:
         """
         Method is used for fit Pipeline imputer / Rescaler model
 
@@ -31,17 +30,20 @@ class FraudDataProcessor(IDataPreprocessor[SparkDataFrame, SparkDataFrame]):
         scaler = MinMaxScaler(
             inputCol="features",
             outputCol="scaled_features",
-            withStd=True,
-            withMean=True
         )
 
         self._pipeline = Pipeline(stages=[assembler, scaler])
+
+        self._model = self._pipeline.fit(input_data)
+        print("model:")
+        # print()
+        self._model.write().overwrite().save(f"file:///tmp/{self._model_path.joinpath(data_name).as_posix()}")
         
-        model = self._pipeline.fit(input_data)
-        model.write().overwrite().save(self._model_path)
-        
+
     def preprocess(self, input_data: SparkDataFrame) -> SparkDataFrame:
         if not self._model:
             raise RuntimeError("Pipelime model was not loaded. Please, check parameters and trye again.")
 
+        print("proprocessed data:")
+        print(input_data.show(5))
         return self._model.transform(input_data)

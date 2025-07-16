@@ -30,10 +30,12 @@ class RupturesDataAnalyser(IDataAnalyser[pd.DataFrame, None]):
         data_frame: pd.DataFrame,
         feature_name: str,
         model: SegmentModelType = SegmentModelType.RadialBasisFunction,
+        data_name: str = ""
     ) -> None:
         
         algo = Pelt(model=model.value).fit(data_frame)
         result = algo.predict(pen=PENALTY_VALUE)
 
-        ruptures.display(data_frame, result, result, computed_chg_pts_linewidth=1)
-        pyplot.savefig(REPORTS_PATH.joinpath(PATH_NAME, Path(feature_name).with_suffix(IMAGE_EXT)))
+        # ruptures.display(data_frame, result, result, computed_chg_pts_linewidth=1)
+        REPORTS_PATH.joinpath(data_name, PATH_NAME).mkdir(exist_ok=True, parents=True)
+        pyplot.savefig(REPORTS_PATH.joinpath(data_name, PATH_NAME, Path(feature_name).with_suffix(IMAGE_EXT)))

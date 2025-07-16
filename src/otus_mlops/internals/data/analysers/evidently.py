@@ -23,7 +23,7 @@ class EvidentlyDataAnalyser(IDataAnalyser[Dataset, None]):
     def __init__(self, report_dir: str = ""):
         self._output_path = Path(report_dir) if report_dir else REPORTS_PATH
 
-    def analyse(self, dataset: Dataset, ref: Union[Dataset, None] = None) -> None:
+    def analyse(self, dataset: Dataset, ref: Union[Dataset, None] = None, data_name: str = "") -> None:
         metrics = [DataSummaryPreset()]
         if ref:
             metrics.append(DriftedColumnsCount())
@@ -36,6 +36,6 @@ class EvidentlyDataAnalyser(IDataAnalyser[Dataset, None]):
         snapshot = report.run(dataset, ref)
 
         report_name = SPLIT_PARTS_REPORT_NAME if ref else WHOLE_DATA_REPORT_NAME
-        report_path = self._output_path.joinpath("evidently", Path(report_name).with_suffix(REPORT_EXT))
+        report_path = self._output_path.joinpath(data_name, "evidently", Path(report_name).with_suffix(REPORT_EXT))
         report_path.parent.mkdir(parents=True, exist_ok=True)
         snapshot.save_html(report_path.as_posix())
