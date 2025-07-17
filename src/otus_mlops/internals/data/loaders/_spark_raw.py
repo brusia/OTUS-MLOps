@@ -7,6 +7,7 @@ from typing import Final, Iterator, Tuple, Union
 
 # import pyarrow.fs as fs
 # import tqdm
+import datetime
 import pandas as pd
 import findspark
 import os
@@ -66,18 +67,23 @@ class SparkRawDataLoader(IDataLoader[SparkDataFrame], AbstractContextManager):
             fs = self._spark.sparkContext._jvm.org.apache.hadoop.fs.FileSystem.get(self._spark.sparkContext._jsc.hadoopConfiguration())
             for status in fs.listStatus(self._spark.sparkContext._jvm.org.apache.hadoop.fs.Path(data_dir.as_posix())):
                 filename = Path(status.getPath().toString())
-    
-            # Добавим колонку с датой без времени
+
             dataset = self._spark.read.csv(f"hdfs://{data_dir.joinpath(filename.name).as_posix()}", schema=custom_schema).dropna(how="all")
             dataset = dataset.withColumn("date_col", F.to_date("tx_datetime"))
 
-            # Получим список уникальных дат
-            dates = sorted([row['date_only'] for row in dataset.select("date_only").distinct().collect()])
+            print(dataset.show(5))
+            dataset.printSchema()
 
-            # Создаем генератор, который по очереди возвращает DataFrame за каждый день
+            # dates = sorted([row['date_col'] if row['date_col'] is not None for row in dataset.select("date_col").distinct().collect()])
+            dates = sorted([row['date_col'] for row in dataset.select("date_col").distinct().collect() if row['date_col'] is not None])
+
             for date in dates:
-                print(date)
-                yield (date, dataset.filter(f"'date_only'= '{date}'"))
+                print(f"date: {date}")
+
+                print(dataset.select('date_col').distinct().show())
+                # print(dataset.filter(dataset.date_col == date).show())
+                # yield (date, dataset.filter(f"date_col = '{date}'").drop('date_col'))
+                yield (str(date), dataset.filter(dataset.date_col == date).drop('date_col'))
 
         elif loading_method == LoadingMethod.FullDataset:
             return ("full_data", self._spark.read.csv(f"hdfs://{data_dir.as_posix()}*", schema=custom_schema).dropna(how="all"))

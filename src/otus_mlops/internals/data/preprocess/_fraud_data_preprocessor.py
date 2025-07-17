@@ -36,7 +36,7 @@ class FraudDataProcessor(IDataPreprocessor[SparkDataFrame, SparkDataFrame]):
 
         self._model = self._pipeline.fit(input_data)
         print("model:")
-        # print()
+        print("/tmp/"+ self._model_path.joinpath(data_name).as_posix())
         self._model.write().overwrite().save(f"file:///tmp/{self._model_path.joinpath(data_name).as_posix()}")
         
 

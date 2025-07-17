@@ -49,7 +49,7 @@ PARTITIONS_COUNT = 10000
 
 # TEST_DATA_SAMPLES_COUNT: Final[int] = 10
 # REF_DATA_SAMPLE_COUNT: Final[int] = 100
-# FULL_DATA_SAMPLES_COUNT: Final[int] = 100
+FULL_DATA_SAMPLES_COUNT: Final[int] = 1000
 
 
 
@@ -123,7 +123,7 @@ def analyse(evidently: bool = False, ruptures: bool = False, statistics: bool = 
                 _logger.info("Run statistics tests for splitted parts (whole dataset).")
                 if ref_data_pandas is not None:
                     for feature_name in NUMERICAL_COLUMNS:
-                        statistical_data_analyser.analyse(data_pandas[feature_name], ref_data_pandas[feature_name], feature_name, data_name)
+                        statistical_data_analyser.analyse(data_pandas[[feature_name]], ref_data_pandas[[feature_name]], feature_name, data_name)
 
 
             print("tx_fraud estimated")
@@ -167,7 +167,7 @@ def analyse(evidently: bool = False, ruptures: bool = False, statistics: bool = 
                 for feature_name in dataset.columns:
                     if feature_name == TIME_COLUMN_NAME:
                         continue
-                    ruptures_data_analyser.analyse(data_pandas[[feature_name]], feature_name=feature_name, data_name=data_name)
+                    ruptures_data_analyser.analyse(data_pandas.sample(n=min(FULL_DATA_SAMPLES_COUNT, len(data_pandas)))[[feature_name]], feature_name=feature_name, data_name=data_name)
 
             for item in REPORTS_PATH.rglob("*"):
                 print(item)
@@ -178,6 +178,14 @@ def analyse(evidently: bool = False, ruptures: bool = False, statistics: bool = 
 
             if ref_data is not None:
                 _logger.info("Start data preprocessing.")
+
+                ref_data = ref_data.filter(
+                        (F.col("transaction_id") > 0) &
+                        (F.col("customer_id") > 0) &
+                        (F.col("terminal_id") > 0) &
+                        (F.col("tx_amount") > 0)
+                    )
+
                 pipe_processor = FraudDataProcessor()
                 pipe_processor.fit_model(ref_data, NUMERICAL_COLUMNS, data_name)
 

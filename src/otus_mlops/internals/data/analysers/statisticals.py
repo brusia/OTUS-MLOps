@@ -18,13 +18,18 @@ REPORT_NAME: Final[str] = "statistical_tests.log"
 
 class StatisticalTestsDataAnalyser(IDataAnalyser[pd.DataFrame, None]):
     def __init__(self, report_dir: str = ""):
-        self._output_path = Path(report_dir) or REPORTS_PATH
-        self._output_path.mkdir(parents=True, exist_ok=True)
+        # self._output_path = Path(report_dir) if Path(report_dir).exists() else
+        self._output_path = REPORTS_PATH
+        print(self._output_path)
+        self._file_handler = FileHandler(self._output_path.joinpath(REPORT_NAME))
+        _logger.addHandler(self._file_handler)
+        # self._output_path.mkdir(parents=True, exist_ok=True)
 
         # _logger.addHandler(FileHandler(self._output_path.joinpath(REPORT_NAME)))
 
     def analyse(self, test_data: pd.DataFrame, ref_data: pd.DataFrame, feature_name: str, data_name: str = "") -> None:
-        _logger.addHandler(FileHandler(self._output_path.joinpath(data_name, REPORT_NAME)))
+        self._output_path.joinpath(data_name).mkdir(parents=True, exist_ok=True)
+        self._file_handler = FileHandler(self._output_path.joinpath(data_name, REPORT_NAME))
 
         # _logger.addHandler(FileHandler(self._output_path.joinpath(REPORT_NAME)))
         _logger.info("Analyse feature '%s'", feature_name)

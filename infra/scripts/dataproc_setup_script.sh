@@ -27,23 +27,23 @@ if [ -n "$FILE_NAME" ]; then
 else
     # Копируем все данные
     log "Copying all data from S3 to HDFS"
-    hadoop distcp s3a://{{ s3_bucket }}/2019-08-22.txt /user/ubuntu/data/2019-08-22.txt
+    # hadoop distcp s3a://{{ s3_bucket }}/2019-08-22.txt /user/ubuntu/data/2019-08-22.txt
     # hadoop distcp s3a://{{ s3_bucket }}/2020-05-18.txt /user/ubuntu/data/2020-05-18.txt
     # hadoop distcp s3a://{{ s3_bucket }}/2022-05-08.txt /user/ubuntu/data/2022-05-08.txt
-    # hadoop distcp s3a://{{ s3_bucket }}/* /user/ubuntu/data
+    hadoop distcp s3a://{{ s3_bucket }}/* /user/ubuntu/data
 fi
 
 # Выводим содержимое директории для проверки
-log "Listing files in HDFS directory"
+# log "Listing files in HDFS directory"
 
 # Проверяем успешность выполнения операции
-if hdfs dfs -ls /user/ubuntu/data
-then
-    log "Data was successfully copied to HDFS"
-else
-    log "Failed to copy data to HDFS"
-    exit 1
-fi
+# if hdfs dfs -ls /user/ubuntu/data
+# then
+#     log "Data was successfully copied to HDFS"
+# else
+#     log "Failed to copy data to HDFS"
+#     exit 1
+# fi
 
 
 # Временное решение. В дальнейшем в локальной сети dataproc-кластера будет развёрнут артефакторий. Из артефактория dataproc кластер будет устанавливать python-пакет. Пока же мы этот пакет собираем из репозитория.
@@ -53,19 +53,16 @@ pip install uv
 git clone {{ git_repo }}
 cd OTUS-MLOps
 git checkout hometask_3
-python3 -m uv venv --system-site-packages
-python3 -m uv sync --group data-analyse
-python3 -m uv pip install -e .
+# python3 -m uv venv --system-site-packages
+# python3 -m uv sync --group data-analyse
+# python3 -m uv pip install -e .
 
+uv venv --system-site-packages
+uv sync --group data-analyse
+uv pip install -e .
 
-# export PATH=/home/ubuntu/.local/bin/uv:$PATH
-# uv venv --system-site-packages
-# uv sync --group data-analyse
-# uv pip install -e .
-
+# запускаем скрипт анализа и очистки данных на удалённой машине
+# для лучше управляемости до настройки запуска по расписанию скрипт анализа и очистки данных
+# лучше запускать мануально, используя утилиты контроля сессии (например, tmux), либо запускать выполнение в фоновом режиме
+# Рекомендация дана с целью избежать прерывания сессии при работе на удалённоq ноде data-proc-master
 # uv run src/otus_mlops/scripts/analyse_data.py
-# uv run src/otus_mlops/scripts/clean_data.py
-
-# hadoop distcp "s3a://brusia-bucket/data/raw/2019-08-22.txt" /user/ubuntu/data/2019-08-22.txt
-# hadoop distcp "s3a://brusia-bucket/data/raw/2020-05-18.txt" /user/ubuntu/data/2020-05-18.txt
-# hadoop distcp "s3a://brusia-bucket/data/raw/2022-05-08.txt" /user/ubuntu/data/2022-05-08.txt
