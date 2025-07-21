@@ -157,16 +157,19 @@ fi
 log "Creating scripts directory on proxy machine"
 mkdir -p $HOME/scripts
 
-# Копируем скрипт upload_data_to_hdfs.sh на прокси-машину
-log "Copying upload_data_to_hdfs.sh script to proxy machine"
-cat > $HOME/scripts/upload_data_to_hdfs.sh << 'EOL'
-${upload_data_to_hdfs_content}
+# Копируем скрипт dataproc_setup_script.sh на прокси-машину
+log "Copying dataproc_setup_script.sh script to proxy machine"
+cat > $HOME/scripts/dataproc_setup_script.sh << 'EOL'
+${dataproc_init_content}
 EOL
-sed -i 's/{{ s3_bucket }}/'$TARGET_BUCKET'\/data\/raw/g' $HOME/scripts/upload_data_to_hdfs.sh
+cat $HOME/scripts/dataproc_setup_script.sh
+sed -i "s|{{ s3_bucket }}|$${TARGET_BUCKET}/data/raw|g" $HOME/scripts/dataproc_setup_script.sh
+sed -i "s|{{ git_repo }}|${git_repo}|g" $HOME/scripts/dataproc_setup_script.sh
+
 
 # Устанавливаем правильные разрешения для скрипта на прокси-машине
-log "Setting permissions for upload_data_to_hdfs.sh on proxy machine"
-chmod +x $HOME/scripts/upload_data_to_hdfs.sh
+log "Setting permissions for dataproc_setup_script.sh on proxy machine"
+chmod +x $HOME/scripts/dataproc_setup_script.sh
 
 # Проверяем подключение к мастер-ноде
 DATAPROC_HOST=${user_name}'@'$DATAPROC_MASTER_FQDN
@@ -180,12 +183,21 @@ else
     exit 1
 fi
 
-# Копируем скрипт upload_data_to_hdfs.sh с прокси-машины на мастер-ноду
+
+# Настраиваем переменные для работы с s3 на dataproc
+# Настраиваем s3cmd
+log "Configuring storage credentials"
+ssh -i $HOME/.ssh/dataproc_key -o StrictHostKeyChecking=no $DATAPROC_HOST "echo 'export AWS_ACCESS_KEY_ID=${access_key}' >> .bashrc"
+ssh -i $HOME/.ssh/dataproc_key -o StrictHostKeyChecking=no $DATAPROC_HOST "echo 'export AWS_SECRET_ACCESS_KEY=${secret_key}' >> .bashrc"
+# ssh -i $HOME/.ssh/dataproc_key -o StrictHostKeyChecking=no $DATAPROC_HOST "source .bashrc"
+
+
+# Копируем скрипт dataproc_setup_script.sh с прокси-машины на мастер-ноду
 log "Create logs directory on dataproc master node"
 ssh -i $HOME/.ssh/dataproc_key -o StrictHostKeyChecking=no $DATAPROC_HOST "mkdir -p $${HOME}/scripts"
 
-log "Copy upload_data_to_hdfs.sh script to master node"
-rsync -a $HOME/scripts/upload_data_to_hdfs.sh $DATAPROC_HOST:$HOME/scripts/upload_data_to_hdfs.sh
+log "Copy dataproc_setup_script.sh script to master node"
+rsync -a $HOME/scripts/dataproc_setup_script.sh $DATAPROC_HOST:$HOME/scripts/setup_script.sh
 if [ $? -eq 0 ]; then
     log "Copy succesfull"
 else
@@ -194,22 +206,24 @@ else
 fi
 
 # Устанавливаем правильные разрешения для скрипта на мастер-ноде
-log "Setting permissions for upload_data_to_hdfs.sh on master node"
-ssh -i $HOME/.ssh/dataproc_key -o StrictHostKeyChecking=no $DATAPROC_HOST "chmod +x $${HOME}/scripts/upload_data_to_hdfs.sh"
+log "Setting permissions for dataproc_setup_script.sh on master node"
+ssh -i $HOME/.ssh/dataproc_key -o StrictHostKeyChecking=no $DATAPROC_HOST "chmod +x $${HOME}/scripts/setup_script.sh"
 
+# Копируем репо на proxy-машину
+# rsync -a $HOME/scripts/repo $DATAPROC_HOST:$HOME/repo/otus-mlops
 
-log "Running upload_data_to_hdfs script on dataproc master node"
+log "Running dataproc_setup_script on dataproc master node"
 mkdir -p $HOME/logs
-ssh -i $HOME/.ssh/dataproc_key -o StrictHostKeyChecking=no ubuntu@$DATAPROC_MASTER_FQDN $${HOME}/scripts/upload_data_to_hdfs.sh > $HOME/logs/dataproc_master_execution.log 2>&1
+ssh -i $HOME/.ssh/dataproc_key -o StrictHostKeyChecking=no ubuntu@$DATAPROC_MASTER_FQDN "$${HOME}/scripts/setup_script.sh" > $HOME/logs/dataproc_master_execution.log 2>&1
 
-log "upload_data_to_hdfs script results"
+log "dataproc_setup_script results"
 cat $HOME/logs/dataproc_master_execution.log
 
-log "Upload results to storage bucket"
-current_time=$( date +'%Y-%m-%d_%H-%M-%S')
-s3cmd put --config=/home/${user_name}/.s3cfg --acl-public \
-    $HOME/logs/dataproc_master_execution.log \
-    s3://$TARGET_BUCKET/logs/$${current_time}_dataproc_master_execution.log
+# log "Upload results to storage bucket"
+# current_time=$( date +'%Y-%m-%d_%H-%M-%S')
+# s3cmd put --config=/home/${user_name}/.s3cfg --acl-public \
+#     $HOME/logs/dataproc_master_execution.log \
+#     s3://$TARGET_BUCKET/logs/$${current_time}_dataproc_master_execution.log
 
 # Изменяем владельца лог-файла
 log "Changing ownership of log file"

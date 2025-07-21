@@ -109,3 +109,12 @@ variable "dataproc_settings" {
         #     })
     })
 }
+
+variable "git" {
+  type = object({
+    repo = string
+    branch = string
+    token = string
+  })
+}
+

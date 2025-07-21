@@ -39,11 +39,10 @@ virtual_machine = {
   cores = 2
   memory = 16
   user_name = "ubuntu"  # do not change, chosen image has only ubuntu-user.
-  # user_name = "brusia"
 }
 
 dataproc_settings = {
-    version = "2.0"
+    version = "2.2"   # 2.0 is not supported for data-analysis tasks
     service_account_name = "brusia-dataproc-service-account"
 
     master_resource = {
@@ -59,4 +58,10 @@ dataproc_settings = {
             disk_size = 128
             hosts_count = 3
             },
+}
+
+git = {
+  repo = "https://github.com/brusia/OTUS-MLOps.git"
+  token = ""
+  branch = "hometask_3"
 }

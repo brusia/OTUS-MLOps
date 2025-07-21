@@ -18,4 +18,5 @@ module "dataproc" {
   dataproc = var.dataproc_settings
   ssh_key = var.ssh_key
   storage_secrets = { access_key = module.storage.service_account_access_key, secret_key = module.storage.service_account_private_key }
+  git = var.git
 }

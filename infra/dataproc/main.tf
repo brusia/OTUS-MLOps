@@ -118,7 +118,7 @@ resource "yandex_dataproc_cluster" "dataproc_cluster" {
       ssh_public_keys = [file(var.ssh_key.public_key_path)]
     }
 
-    # TODO: dinamic instantiate from cfg
+    # TODO: dynamic instantiate from cfg
     subcluster_spec {
       name = "master"
       role = "MASTERNODE"
@@ -148,12 +148,12 @@ resource "yandex_dataproc_cluster" "dataproc_cluster" {
     #   name = "compute"
     #   role = "COMPUTENODE"
     #   resources {
-    #     resource_preset_id = var.dataproc_compute_resources.resource_preset_id
-    #     disk_type_id       = "network-ssd"
-    #     disk_size          = var.dataproc_compute_resources.disk_size
+    #     resource_preset_id = var.dataproc.compute_resources.resource_preset_id
+    #     disk_type_id       = var.dataproc.compute_resources.disk_type_id
+    #     disk_size          = var.dataproc.compute_resources.disk_size
     #   }
     #   subnet_id   = module.network.subnet_id
-    #   hosts_count = 1
+    #   hosts_count = var.dataproc.compute_resources.hosts_count
     # }
   }
 }
@@ -176,7 +176,7 @@ resource "yandex_compute_instance" "proxy" {
   metadata = {
     # ssh-keys = "${var.virtual_machine.user_name}:${file(var.ssh_key.public_key_path)}"
     ssh-keys = "ubuntu:${file(var.ssh_key.public_key_path)}"
-    user-data = templatefile("${path.root}/scripts/user_data.sh", {
+    user-data = templatefile("${path.root}/scripts/proxy_setup.sh", {
       token                       = var.cloud_auth.token
       cloud_id                    = var.cloud_auth.cloud_id
       folder_id                   = var.cloud_auth.folder_id
@@ -186,7 +186,11 @@ resource "yandex_compute_instance" "proxy" {
       s3_bucket                   = var.bucket_name
       # user_name                   = var.virtual_machine.user_name
       user_name = "ubuntu"
-      upload_data_to_hdfs_content = file("${path.root}/scripts/upload_data_to_hdfs.sh")
+      dataproc_init_content = file("${path.root}/scripts/dataproc_setup_script.sh")
+      # git_user                    = var.git_user
+      git_repo                    = var.git.repo
+      git_branch = var.git.branch
+      git_token                   = var.git.token
     })
   }
 
