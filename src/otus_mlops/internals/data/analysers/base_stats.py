@@ -5,15 +5,11 @@ import numpy as np
 import pandas as pd
 from pyspark.sql import DataFrame as SparkDataFrame
 from pyspark.sql.window import Window
-# from pyspark.sql.functions import col, expr, when, lit, countDistinct, count, stddev_pop, avg
 from pyspark.sql.types import DoubleType, StringType, NumericType, DateType
 
 from pyspark.ml.stat import Correlation
 from pyspark.ml.feature import VectorAssembler
 
-# from pyspark.sql.functions import countDistinct
-# from evidently import Calculator
-# from evidently.model_quality import data_quality, target_quality
 from otus_mlops.internals.interfaces import IDataAnalyser
 from otus_mlops.internals.interfaces.base import BaseStatistics
 
@@ -34,7 +30,6 @@ class SparkBaseStatisticsDataAnalyser(IDataAnalyser[SparkDataFrame, BaseStatisti
         ]
 
         base_stats: Dict[str, Dict[str, float | int]] = {}
-        # histo: Dict[str, List[float]] = {}
 
         for field_name in field_names:
             base_stats[field_name] = self._calculate_base_statistics(data_frame, field_name)

@@ -3,9 +3,7 @@ from pathlib import Path
 from typing import Final, Union  # , override
 import pandas as pd
 
-# from evidently import Calculator
-from evidently.ui.workspace import RemoteWorkspace  # type: ignore[import-untyped, import-not-found]
-from evidently import DataDefinition, Dataset, Report  # type: ignore[import-untyped, import-not-found]
+from evidently import Dataset, Report  # type: ignore[import-untyped, import-not-found]
 from evidently.presets import DataSummaryPreset  # type: ignore[import-untyped, import-not-found]
 
 from otus_mlops.internals.interfaces import REPORTS_PATH, IDataAnalyser

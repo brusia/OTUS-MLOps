@@ -27,7 +27,7 @@ _logger: Logger = logging.getLogger(__name__)
 
 class SparkRawDataLoader(IDataLoader[SparkDataFrame], AbstractContextManager):
     def __enter__(self):
-        venv_python = os.path.join(os.path.dirname(sys.executable), "python")
+        # venv_python = os.path.join(os.path.dirname(sys.executable), "python")
 
         findspark.init()
         self._spark = (
@@ -71,18 +71,9 @@ class SparkRawDataLoader(IDataLoader[SparkDataFrame], AbstractContextManager):
             dataset = self._spark.read.csv(f"hdfs://{data_dir.joinpath(filename.name).as_posix()}", schema=custom_schema).dropna(how="all")
             dataset = dataset.withColumn("date_col", F.to_date("tx_datetime"))
 
-            print(dataset.show(5))
-            dataset.printSchema()
-
-            # dates = sorted([row['date_col'] if row['date_col'] is not None for row in dataset.select("date_col").distinct().collect()])
             dates = sorted([row['date_col'] for row in dataset.select("date_col").distinct().collect() if row['date_col'] is not None])
 
             for date in dates:
-                print(f"date: {date}")
-
-                print(dataset.select('date_col').distinct().show())
-                # print(dataset.filter(dataset.date_col == date).show())
-                # yield (date, dataset.filter(f"date_col = '{date}'").drop('date_col'))
                 yield (str(date), dataset.filter(dataset.date_col == date).drop('date_col'))
 
         elif loading_method == LoadingMethod.FullDataset:
@@ -97,8 +88,6 @@ class SparkRawDataLoader(IDataLoader[SparkDataFrame], AbstractContextManager):
             self._upload_pandas_data(data_frame, output_path)
 
     def _upload_spark_data(self, data_frame: SparkDataFrame, output_path: str):
-        print(data_frame.show(5))
-        print(f"s3a://{BUCKET_NAME}/{output_path}")
         data_frame.write.format("parquet").save(
             f"s3a://{BUCKET_NAME}/{output_path}"
         )

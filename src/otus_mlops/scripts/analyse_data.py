@@ -12,30 +12,22 @@ from otus_mlops.internals.data.analysers import (
     RupturesDataAnalyser,
 )
 from otus_mlops.internals.data.analysers import StatisticalTestsDataAnalyser
-from otus_mlops.internals.data.analysers.evidently import (
-    REPORT_EXT as EVIDENTLY_REPORT_EXT,
-    SPLIT_PARTS_REPORT_NAME as EVIDENTLY_REPORT_NAME,
-    WHOLE_DATA_REPORT_NAME as EVIDENTLY_FULL_REPORT_NAME
-)
 from otus_mlops.internals.data.preprocess._fraud_data_preprocessor import FraudDataProcessor
-from otus_mlops.internals.interfaces import LoadingMethod, REPORTS_PATH
+from otus_mlops.internals.interfaces import REPORTS_PATH
 import pandas as pd
 
 import json
 import logging
 from otus_mlops.internals.data.loaders._spark_raw import SparkRawDataLoader
-from otus_mlops.internals.interfaces import IDataAnalyser
 from otus_mlops.internals.interfaces.base import BUCKET_NAME, NUMERICAL_COLUMNS, PREPROCESS_DATA_MODEL_PATH, S3_ENDPOINT_URL
 from pyspark.sql import DataFrame as SparkDataFrame
 
 _logger = logging.getLogger(__name__)
 _logger.setLevel(logging.DEBUG)
 
-# BUCKET_NAME: Final[str] = "brusia-bucket"
 RAW_STATISTICS_FOLDER_NAME: Final[str] = "raw-statistics"
 BASE_STATISTICS_FILE_NAME: Final[Path] = Path("base_statistics.json")
 CORRELATION_MATRIX_FILE_NAME: Final[Path] = Path("correlations.csv")
-# HISTO_FILE_NAME: Final[Path] = Path("histo.csv")
 TIME_COLUMN_NAME: Final[str] = "tx_datetime"
 
 
@@ -44,11 +36,8 @@ REF_DATA_SAMPLE_COUNT: Final[int] = 10000
 FULL_DATA_SAMPLES_COUNT: Final[int] = 100000
 
 OUTPUT_DATA_PATH: Final[Path] = Path("data/processed/")
-# DATA_EXTENSION: Final[str] = ".parquet"
 PARTITIONS_COUNT = 10000
 
-# TEST_DATA_SAMPLES_COUNT: Final[int] = 10
-# REF_DATA_SAMPLE_COUNT: Final[int] = 100
 FULL_DATA_SAMPLES_COUNT: Final[int] = 1000
 
 
@@ -76,98 +65,84 @@ def analyse(evidently: bool = False, ruptures: bool = False, statistics: bool = 
     s3 = boto3.session.Session().client(service_name="s3", endpoint_url=S3_ENDPOINT_URL)
 
     with SparkRawDataLoader() as data_loader:
-
-        # rdd = data_loader._spark.sparkContext.parallelize(["test", "123", "hello"])
-        # rdd.saveAsTextFile(f"s3a://{BUCKET_NAME}/test/test.txt")
         _logger.info("Initialize data analysers.")
 
         print("load data")
         ref_data: Union[SparkDataFrame, None] = None
         ref_data_pandas: Union[pd.DataFrame, None] = None
         for data_name, dataset in data_loader.load():
-            # data_name, dataset = data.items()
-            
-            dataset = dataset.limit(100).cache()
-            # print(dataset.schema)
-
-            print("dataset")
-            print(dataset.show(5))
-
-            # data_name = dataset.collect()[1][0]
-            print(data_name)
-
-            print(dataset.show(5))
-            print(ref_data)
-            print(ref_data_pandas)
 
             if ruptures or evidently or statistics:
                 data_pandas = _convert_to_pandas(dataset)
 
-            if statistics:
-                base_data_analyser = SparkBaseStatisticsDataAnalyser()
-                statistical_data_analyser = StatisticalTestsDataAnalyser()
-                base_statistics = base_data_analyser.analyse(dataset)
+            try:
+                if statistics:
+                    base_data_analyser = SparkBaseStatisticsDataAnalyser()
+                    statistical_data_analyser = StatisticalTestsDataAnalyser()
+                    base_statistics = base_data_analyser.analyse(dataset)
 
-                s3.put_object(
-                    Bucket=BUCKET_NAME,
-                    Key=REPORTS_PATH.joinpath(data_name, RAW_STATISTICS_FOLDER_NAME, BASE_STATISTICS_FILE_NAME.as_posix()).as_posix(),
-                    Body=json.dumps(base_statistics.base_stats),
-                )
+                    s3.put_object(
+                        Bucket=BUCKET_NAME,
+                        Key=REPORTS_PATH.joinpath(data_name, RAW_STATISTICS_FOLDER_NAME, BASE_STATISTICS_FILE_NAME.as_posix()).as_posix(),
+                        Body=json.dumps(base_statistics.base_stats),
+                    )
 
-                s3.put_object(
-                    Bucket=BUCKET_NAME,
-                    Key=REPORTS_PATH.joinpath(data_name, RAW_STATISTICS_FOLDER_NAME, CORRELATION_MATRIX_FILE_NAME.as_posix()).as_posix(),
-                    Body=base_statistics.correlations.to_json(),
-                )
+                    s3.put_object(
+                        Bucket=BUCKET_NAME,
+                        Key=REPORTS_PATH.joinpath(data_name, RAW_STATISTICS_FOLDER_NAME, CORRELATION_MATRIX_FILE_NAME.as_posix()).as_posix(),
+                        Body=base_statistics.correlations.to_json(),
+                    )
 
-                _logger.info("Run statistics tests for splitted parts (whole dataset).")
-                if ref_data_pandas is not None:
-                    for feature_name in NUMERICAL_COLUMNS:
-                        statistical_data_analyser.analyse(data_pandas[feature_name], ref_data_pandas[feature_name], feature_name, data_name)
+                    _logger.info("Run statistics tests for splitted parts (whole dataset).")
+                    if ref_data_pandas is not None:
+                        for feature_name in NUMERICAL_COLUMNS:
+                            statistical_data_analyser.analyse(data_pandas[feature_name], ref_data_pandas[feature_name], feature_name, data_name)
+            except Exception as ex:
+                print(ex.with_traceback)
 
 
-            print("tx_fraud estimated")
-            print(dataset.groupBy("tx_fraud").count().show())
+            try:
+                if evidently:
+                    evidently_data_analyser = EvidentlyDataAnalyser()
+                    schema = DataDefinition(
+                            numerical_columns=NUMERICAL_COLUMNS,
+                            datetime_columns=[TIME_COLUMN_NAME],
+                            classification=[
+                            BinaryClassification(name="binary", target = "tx_fraud", prediction_labels="prediction"),
+                                    MulticlassClassification(
+                                            name="multi",
+                                            target="tx_fraud_scenario",
+                                            prediction_labels="prediction",
+                                        )
+                                    ]
+                                )
 
-            print("tx_fraud scenario estimated")
-            print(dataset.groupBy("tx_fraud_scenario").count().show())
-
-            if evidently:
-                evidently_data_analyser = EvidentlyDataAnalyser()
-                schema = DataDefinition(
-                        numerical_columns=NUMERICAL_COLUMNS,
-                        datetime_columns=[TIME_COLUMN_NAME],
-                        classification=[
-                        BinaryClassification(name="binary", target = "tx_fraud", prediction_labels="prediction"),
-                                MulticlassClassification(
-                                        name="multi",
-                                        target="tx_fraud_scenario",
-                                        prediction_labels="prediction",
-                                    )
-                                ]
-                            )
-
-                _logger.info("Run evdently analyser for whole dataset.")
-                evidently_data_analyser.analyse(
-                    dataset=Dataset.from_pandas(data=data_pandas, data_definition=schema),
-                    data_name=data_name
-                )
-
-                if ref_data_pandas is not None:
-                    _logger.info("Run evdently analyser for splitted parts.")
+                    _logger.info("Run evdently analyser for whole dataset.")
                     evidently_data_analyser.analyse(
                         dataset=Dataset.from_pandas(data=data_pandas, data_definition=schema),
-                        ref=Dataset.from_pandas(data=ref_data_pandas, data_definition=schema),
                         data_name=data_name
                     )
 
-            if ruptures:
-                ruptures_data_analyser = RupturesDataAnalyser()
-                _logger.info("Run ruptures analyser.")
-                for feature_name in dataset.columns:
-                    if feature_name == TIME_COLUMN_NAME:
-                        continue
-                    ruptures_data_analyser.analyse(data_pandas.sample(n=min(FULL_DATA_SAMPLES_COUNT, len(data_pandas)))[[feature_name]], feature_name=feature_name, data_name=data_name)
+                    if ref_data_pandas is not None:
+                        _logger.info("Run evdently analyser for splitted parts.")
+                        evidently_data_analyser.analyse(
+                            dataset=Dataset.from_pandas(data=data_pandas, data_definition=schema),
+                            ref=Dataset.from_pandas(data=ref_data_pandas, data_definition=schema),
+                            data_name=data_name
+                        )
+            except Exception as ex:
+                print(ex.with_traceback)
+
+            try:
+                if ruptures:
+                    ruptures_data_analyser = RupturesDataAnalyser()
+                    _logger.info("Run ruptures analyser.")
+                    for feature_name in dataset.columns:
+                        if feature_name == TIME_COLUMN_NAME:
+                            continue
+                        ruptures_data_analyser.analyse(data_pandas.sample(n=min(FULL_DATA_SAMPLES_COUNT, len(data_pandas)))[[feature_name]], feature_name=feature_name, data_name=data_name)
+            except Exception as ex:
+                print(ex.with_traceback)
 
             for item in REPORTS_PATH.rglob("*"):
                 print(item)
@@ -176,42 +151,44 @@ def analyse(evidently: bool = False, ruptures: bool = False, statistics: bool = 
 
             _logger.info("Data analyse completed.")
 
-            if ref_data is not None:
-                _logger.info("Start data preprocessing.")
 
-                ref_data = ref_data.filter(
-                        (F.col("transaction_id") > 0) &
-                        (F.col("customer_id") > 0) &
-                        (F.col("terminal_id") > 0) &
-                        (F.col("tx_amount") > 0)
-                    )
+            try:
+                if ref_data is not None:
+                    _logger.info("Start data preprocessing.")
 
-                pipe_processor = FraudDataProcessor()
-                pipe_processor.fit_model(ref_data, NUMERICAL_COLUMNS, data_name)
+                    ref_data = ref_data.filter(
+                            (F.col("transaction_id") > 0) &
+                            (F.col("customer_id") > 0) &
+                            (F.col("terminal_id") > 0) &
+                            (F.col("tx_amount") > 0)
+                        )
 
-                for item in Path("/tmp").joinpath(PREPROCESS_DATA_MODEL_PATH).rglob("*"):
-                    print(item.relative_to(Path("/tmp")))
-                    if Path(item).is_file():
-                        _upload_file(s3, item, item.relative_to(Path("/tmp")))
+                    pipe_processor = FraudDataProcessor()
+                    pipe_processor.fit_model(ref_data, NUMERICAL_COLUMNS, data_name)
 
-                _logger.info("Data analyse completed.")
+                    for item in Path("/tmp").joinpath(PREPROCESS_DATA_MODEL_PATH).rglob("*"):
+                        print(item.relative_to(Path("/tmp")))
+                        if Path(item).is_file():
+                            _upload_file(s3, item, item.relative_to(Path("/tmp")))
 
-                processed_data: SparkDataFrame = pipe_processor.preprocess(dataset)
-                print("finish proprocess:")
-                print(processed_data.show(5))
-                processed_data.write.parquet(f"file:///tmp/{OUTPUT_DATA_PATH.joinpath(data_name)}")
+                    _logger.info("Data analyse completed.")
 
-                for item in Path("/tmp").joinpath(OUTPUT_DATA_PATH, data_name).rglob("*"):
-                    print(item.relative_to(Path("/tmp")))
-                    if Path(item).is_file():
-                        _upload_file(s3, item, item.relative_to(Path("/tmp")))
+                    processed_data: SparkDataFrame = pipe_processor.preprocess(dataset)
+                    processed_data.write.parquet(f"file:///tmp/{OUTPUT_DATA_PATH.joinpath(data_name)}")
 
-                shutil.rmtree(Path("/tmp").joinpath(OUTPUT_DATA_PATH, data_name))
-                shutil.rmtree(Path("/tmp").joinpath(PREPROCESS_DATA_MODEL_PATH))
-                shutil.rmtree(REPORTS_PATH.joinpath(data_name))
-            
-            ref_data = dataset
-            ref_data_pandas = data_pandas
+                    for item in Path("/tmp").joinpath(OUTPUT_DATA_PATH, data_name).rglob("*"):
+                        print(item.relative_to(Path("/tmp")))
+                        if Path(item).is_file():
+                            _upload_file(s3, item, item.relative_to(Path("/tmp")))
+
+                    shutil.rmtree(Path("/tmp").joinpath(OUTPUT_DATA_PATH, data_name))
+                    shutil.rmtree(Path("/tmp").joinpath(PREPROCESS_DATA_MODEL_PATH))
+                    shutil.rmtree(REPORTS_PATH.joinpath(data_name))
+                
+                ref_data = dataset
+                ref_data_pandas = data_pandas
+            except Exception as ex:
+                print(ex.with_traceback)
 
 if __name__ == "__main__":
-    analyse(evidently=True, ruptures=True, statistics=True)
+    analyse(evidently=True, ruptures=False, statistics=True)
