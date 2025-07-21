@@ -87,7 +87,7 @@ def analyse(evidently: bool = False, ruptures: bool = False, statistics: bool = 
         for data_name, dataset in data_loader.load():
             # data_name, dataset = data.items()
             
-            # dataset = dataset.limit(100).cache()
+            dataset = dataset.limit(100).cache()
             # print(dataset.schema)
 
             print("dataset")
@@ -123,7 +123,7 @@ def analyse(evidently: bool = False, ruptures: bool = False, statistics: bool = 
                 _logger.info("Run statistics tests for splitted parts (whole dataset).")
                 if ref_data_pandas is not None:
                     for feature_name in NUMERICAL_COLUMNS:
-                        statistical_data_analyser.analyse(data_pandas[[feature_name]], ref_data_pandas[[feature_name]], feature_name, data_name)
+                        statistical_data_analyser.analyse(data_pandas[feature_name], ref_data_pandas[feature_name], feature_name, data_name)
 
 
             print("tx_fraud estimated")

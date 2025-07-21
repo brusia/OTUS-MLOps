@@ -21,6 +21,8 @@ class StatisticalTestsDataAnalyser(IDataAnalyser[pd.DataFrame, None]):
         # self._output_path = Path(report_dir) if Path(report_dir).exists() else
         self._output_path = REPORTS_PATH
         print(self._output_path)
+
+        self._output_path.mkdir(parents=True, exist_ok=True)
         self._file_handler = FileHandler(self._output_path.joinpath(REPORT_NAME))
         _logger.addHandler(self._file_handler)
         # self._output_path.mkdir(parents=True, exist_ok=True)
