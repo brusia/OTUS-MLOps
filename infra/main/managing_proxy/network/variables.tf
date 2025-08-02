@@ -8,6 +8,7 @@ variable "cloud_auth" {
         token = string
         cloud_id = string
         folder_id = string
+        security_group_name = string
     })
 }
 

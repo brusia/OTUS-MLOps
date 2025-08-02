@@ -2,6 +2,12 @@ variable "zone" {
     type = string
 }
 
+variable "bucket_name" {
+  type        = string
+  description = "Name of the bucket"
+  default = "brusia-bucket"
+}
+
 # yandex cloud provider authentification data
 variable "cloud_auth" {
   type = object({
@@ -81,35 +87,6 @@ variable "virtual_machine" {
     })
 }
 
-# TODO: figure out how to make resources dynamic
-variable "dataproc_settings" {
-      type = object({
-        version = string
-        service_account_name = string
-
-        master_resource = object({
-            resource_preset_id = string
-            disk_type_id       = string
-            disk_size          = number
-            hosts_count = number
-            })
-
-        data_resources = object({
-            resource_preset_id = string
-            disk_type_id       = string
-            disk_size          = number
-            hosts_count = number
-            })
-
-        # compute_resources = object({
-        #     resource_preset_id = string
-        #     disk_type_id       = string
-        #     disk_size          = number
-        #     hosts_count = number
-        #     })
-    })
-}
-
 variable "git" {
   type = object({
     repo = string
@@ -117,4 +94,3 @@ variable "git" {
     token = string
   })
 }
-

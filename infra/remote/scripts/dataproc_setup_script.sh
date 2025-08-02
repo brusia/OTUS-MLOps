@@ -27,10 +27,10 @@ if [ -n "$FILE_NAME" ]; then
 else
     # Копируем все данные
     log "Copying all data from S3 to HDFS"
-    # hadoop distcp s3a://{{ s3_bucket }}/2019-08-22.txt /user/ubuntu/data/2019-08-22.txt
+    hadoop distcp s3a://{{ s3_bucket }}/2019-08-22.txt /user/ubuntu/data/2019-08-22.txt
     # hadoop distcp s3a://{{ s3_bucket }}/2020-05-18.txt /user/ubuntu/data/2020-05-18.txt
     # hadoop distcp s3a://{{ s3_bucket }}/2022-05-08.txt /user/ubuntu/data/2022-05-08.txt
-    hadoop distcp s3a://{{ s3_bucket }}/* /user/ubuntu/data
+    # hadoop distcp s3a://{{ s3_bucket }}/* /user/ubuntu/data
 fi
 
 # Выводим содержимое директории для проверки
@@ -52,7 +52,7 @@ fi
 pip install uv
 git clone {{ git_repo }}
 cd OTUS-MLOps
-git checkout hometask_3
+git checkout hometask_4
 # python3 -m uv venv --system-site-packages
 # python3 -m uv sync --group data-analyse
 # python3 -m uv pip install -e .
