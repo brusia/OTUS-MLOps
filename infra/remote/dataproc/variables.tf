@@ -12,17 +12,17 @@ variable "cloud_auth" {
         token = string
         cloud_id = string
         folder_id = string
-        service_account_name = string
-        security_group_name = string
+        # service_account_name = string
+        # security_group_name = string
     })
 }
 
-variable "ssh_key" {
-    type = object({
-      public_key_path = string
-        private_key_path = string
-    })
-}
+# variable "ssh_key" {
+#     type = object({
+#       public_key_path = string
+#         private_key_path = string
+#     })
+# }
 
 variable "network_settings" {
     type = object({
@@ -37,17 +37,17 @@ variable "network_settings" {
     })
 }
 
-variable "virtual_machine" {
-    type = object({
-      name = string
-      instance_name = string
-      image_id = string
-      platform_id = string
-      user_name = string
-      cores = number
-      memory = number
-    })
-}
+# variable "virtual_machine" {
+#     type = object({
+#       name = string
+#       instance_name = string
+#       image_id = string
+#       platform_id = string
+#       user_name = string
+#       cores = number
+#       memory = number
+#     })
+# }
 
 variable "storage_secrets" {
   type = object({
@@ -115,4 +115,3 @@ variable "dataproc" {
         # }
     # }
 }
-
