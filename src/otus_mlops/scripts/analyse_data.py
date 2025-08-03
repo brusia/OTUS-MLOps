@@ -98,7 +98,7 @@ def analyse(evidently: bool = False, ruptures: bool = False, statistics: bool = 
                         for feature_name in NUMERICAL_COLUMNS:
                             statistical_data_analyser.analyse(data_pandas[feature_name], ref_data_pandas[feature_name], feature_name, data_name)
             except Exception as ex:
-                print(ex.with_traceback)
+                _logger.exception(ex)
 
 
             try:
@@ -131,7 +131,7 @@ def analyse(evidently: bool = False, ruptures: bool = False, statistics: bool = 
                             data_name=data_name
                         )
             except Exception as ex:
-                print(ex.with_traceback)
+                _logger.exception(ex)
 
             try:
                 if ruptures:
@@ -142,7 +142,7 @@ def analyse(evidently: bool = False, ruptures: bool = False, statistics: bool = 
                             continue
                         ruptures_data_analyser.analyse(data_pandas.sample(n=min(FULL_DATA_SAMPLES_COUNT, len(data_pandas)))[[feature_name]], feature_name=feature_name, data_name=data_name)
             except Exception as ex:
-                print(ex.with_traceback)
+                _logger.exception(ex)
 
             for item in REPORTS_PATH.rglob("*"):
                 print(item)
@@ -161,7 +161,7 @@ def analyse(evidently: bool = False, ruptures: bool = False, statistics: bool = 
                             (F.col("customer_id") > 0) &
                             (F.col("terminal_id") > 0) &
                             (F.col("tx_amount") > 0)
-                        )
+                        ).dropna()
 
                     pipe_processor = FraudDataProcessor()
                     pipe_processor.fit_model(ref_data, NUMERICAL_COLUMNS, data_name)
@@ -174,7 +174,8 @@ def analyse(evidently: bool = False, ruptures: bool = False, statistics: bool = 
                     _logger.info("Data analyse completed.")
 
                     processed_data: SparkDataFrame = pipe_processor.preprocess(dataset)
-                    processed_data.write.parquet(f"file:///tmp/{OUTPUT_DATA_PATH.joinpath(data_name)}")
+                    print(processed_data.show())
+                    processed_data.write.mode('overwrite').parquet(f"file:///tmp/{OUTPUT_DATA_PATH.joinpath(data_name, 'data.parquet').as_posix()}")
 
                     for item in Path("/tmp").joinpath(OUTPUT_DATA_PATH, data_name).rglob("*"):
                         print(item.relative_to(Path("/tmp")))
@@ -188,7 +189,7 @@ def analyse(evidently: bool = False, ruptures: bool = False, statistics: bool = 
                 ref_data = dataset
                 ref_data_pandas = data_pandas
             except Exception as ex:
-                print(ex.with_traceback)
+                _logger.exception(ex)
 
 if __name__ == "__main__":
     analyse(evidently=True, ruptures=False, statistics=True)

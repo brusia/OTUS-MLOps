@@ -23,7 +23,8 @@ class FraudDataProcessor(IDataPreprocessor[SparkDataFrame, SparkDataFrame]):
 
         assembler = VectorAssembler(
             inputCols=NUMERICAL_COLUMNS,
-            outputCol="features"
+            outputCol="features",
+            handleInvalid='skip'
         )
 
         # todo: customize scaler choosing: MinMax, Standard, etc.
