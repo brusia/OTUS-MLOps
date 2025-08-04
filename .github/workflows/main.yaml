@@ -1,0 +1,32 @@
+name: CI/CD
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'src/**'
+
+env:
+  YC_S3_BUCKET: ${{ secrets.S3_BUCKET_NAME }}
+  YC_S3_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY }}
+  YC_S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_KEY }}
+  YC_S3_ENDPOINT: ${{ secrets.S3_ENDPOINT_URL }}
+
+jobs:
+  upload-src:
+    name: Upload Source code to S3
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: Upload to S3
+        uses: jakejarvis/s3-sync-action@master
+        with:
+          args: --delete
+        env:
+          AWS_S3_BUCKET: ${{ env.S3_BUCKET_NAME }}
+          AWS_ACCESS_KEY_ID: ${{ env.S3_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ env.S3_SECRET_ACCESS_KEY }}
+          AWS_S3_ENDPOINT: ${{ env.S3_ENDPOINT }}
+          SOURCE_DIR: 'src/scripts'
+          DEST_DIR: 'src'

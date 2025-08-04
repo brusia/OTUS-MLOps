@@ -31,3 +31,7 @@ restart_proxy:
 
 compute: create_manager
 	cd infra/main && terraform destroy -target=module.managing_proxy -auto-approve
+
+sync_dags:
+	rsync -a dags/ ubuntu@ya_proxy:/home/ubuntu/dags/ && \
+	ssh ubuntu@ya_proxy "sudo chown -R ubuntu:ubuntu /home/ubuntu/dags"

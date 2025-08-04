@@ -14,9 +14,11 @@ dependencies = [
 ]
 
 [dependency-groups]
-# airflow = [
-#     "apache-airflow[yandex]>=2.10.3",
-# ]
+github_secrets = [
+    "dotenv>=0.9.9",
+    "pynacl>=1.5.0",
+    "requests>=2.32.4",
+]
 data-analyse = [
     "evidently>=0.7.6",
     "matplotlib>=3.7.5",
@@ -32,6 +34,6 @@ data-analyse = [
 # ]
 
 
-[[tool.uv.index]]
-name = "brusia-index"
-url = "https://brusia.github.io/github-hosted-pypi/"
+# [[tool.uv.index]]
+# name = "brusia-index"
+# url = "https://brusia.github.io/github-hosted-pypi/"
