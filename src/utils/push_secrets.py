@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 secrets = dotenv_values(".env")
 secrets_blacklist = ["GITHUB_TOKEN", "GITHUB_REPO", "PRIVATE_KEY_PATH"]
 
-GITHUB_TOKEN = secrets.get("GITHUB_TOKEN")  # Убедитесь, что токен есть в .env
-GITHUB_REPO = secrets.get("GITHUB_REPO")  # Убедитесь, что имя репозитория есть в .env
+GITHUB_TOKEN = secrets.get("GITHUB_TOKEN")
+GITHUB_REPO = secrets.get("GITHUB_REPO")
 
 if not GITHUB_TOKEN or not GITHUB_REPO:
     raise ValueError("GITHUB_TOKEN и GITHUB_REPO должны быть определены в .env")
@@ -30,7 +30,6 @@ def encrypt_secret(public_key: str, secret_value: str) -> str:
     """
     Encrypt a secret value using the repository's public key.
     """
-    # Public key уже предоставлен в Base64
     public_key_bytes = base64.b64decode(public_key)
     public_key_obj = public.PublicKey(public_key_bytes)
     sealed_box = public.SealedBox(public_key_obj)
