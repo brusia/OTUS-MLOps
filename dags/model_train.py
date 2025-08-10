@@ -15,7 +15,8 @@ from airflow.providers.apache.spark.operators.spark_submit import SparkSubmitOpe
 from airflow.providers.yandex.operators.dataproc import (
     DataprocCreateClusterOperator,
     DataprocCreatePysparkJobOperator,
-    DataprocDeleteClusterOperator
+    DataprocDeleteClusterOperator,
+    InitializationAction
 )
 
 YC_ZONE = Variable.get("YC_ZONE")
@@ -39,7 +40,16 @@ DP_SA_JSON = Variable.get("DP_SA_JSON")
 DP_SA_ID = Variable.get("DP_SA_ID")
 DP_SECURITY_GROUP_ID = Variable.get("DP_SECURITY_GROUP_ID")
 INPUT_DATA_DIR: Final[str] = "data/raw"
-LAST_DATE_PROCESSED: Union[str, None] = None
+
+MLFLOW_TRACKING_URI = Variable.get("MLFLOW_TRACKING_URI")
+MLFLOW_EXPERIMENT_NAME = "test-mlflow-experiment-train"
+
+S3_INPUT_DATA_BUCKET = f"s3a://{S3_BUCKET_NAME}/test/input_data"
+# S3_OUTPUT_MODEL_BUCKET = f"s3a://{S3_BUCKET_NAME}/test/models"
+S3_SRC_BUCKET = f"s3a://{S3_BUCKET_NAME}/src"
+S3_DP_LOGS_BUCKET = f"s3a://{S3_BUCKET_NAME}/test/logs/airflow_logs/"
+S3_VENV_ARCHIVE = f"s3a://{S3_BUCKET_NAME}/src/venvs/venv.tar.gz"
+
 
 envs = {"S3_ENDPOINT_URL": S3_ENDPOINT_URL, "S3_BUCKET_NAME": S3_BUCKET_NAME, "S3_ACCESS_KEY": S3_ACCESS_KEY,
 "S3_SECRET_KEY": S3_SECRET_KEY, "YC_TOKEN": YC_TOKEN, "YC_ZONE": YC_ZONE, "YC_SUBNET_ID": YC_SUBNET_ID, "YC_FOLDER_ID": YC_FOLDER_ID,
@@ -57,12 +67,10 @@ def get_cluster_id_from_xcom(**kwargs):
     return cluster_id
 
 
-# Настройки DAG
 with DAG(
-    dag_id="data_preprocess",
+    dag_id="testing-train-model",
     start_date=datetime(year=2025, month=8, day=3),
-    schedule=timedelta(days=1),
-    # schedule=timedelta(hours=2),
+    # schedule=timedelta(days=1),
     catchup=False
 ) as dag:
     delete_cluster_using_bash = BashOperator(
@@ -100,6 +108,13 @@ with DAG(
 
         # software
         services=["YARN", "SPARK", "HDFS", "MAPREDUCE"],
+        # initialization_actions = [ 
+        #     InitializationAction(uri = f"s3a://{S3_BUCKET_NAME}/scripts/prepare_cluster.sh",
+        #         timeout=700,
+        #         args=[]
+        #         # args=[S3_ACCESS_KEY, S3_SECRET_KEY]
+        #         )
+        #     ]
     )
 
 
@@ -109,12 +124,27 @@ with DAG(
         trigger_rule=TriggerRule.ALL_DONE
     )
 
-
     spark_processing = DataprocCreatePysparkJobOperator(
         task_id="cluster-pyspark-task",
         cluster_id="{{ ti.xcom_pull(task_ids='get_cluster_info') }}",
-        main_python_file_uri=f"s3a://{S3_BUCKET_NAME}/src/clear_data.py",
-        args=["--access_key", S3_ACCESS_KEY, "--secret_key", S3_SECRET_KEY],
+        main_python_file_uri=f"s3a://{S3_BUCKET_NAME}/src/model_train.py",
+
+        args=[
+            "--tracking-uri", MLFLOW_TRACKING_URI,
+            "--experiment-name", MLFLOW_EXPERIMENT_NAME,
+            "--auto-register",
+            "--s3-endpoint-url", S3_ENDPOINT_URL,
+            "--s3-access-key", S3_ACCESS_KEY,
+            "--s3-secret-key", S3_SECRET_KEY,
+            "--run-name", f"training_{datetime.now().strftime('%Y%m%d_%H%M')}"
+        ],
+        properties={
+            'spark.submit.deployMode': 'cluster',
+            'spark.yarn.dist.archives': f'{S3_VENV_ARCHIVE}#.venv',
+            'spark.yarn.appMasterEnv.PYSPARK_PYTHON': './.venv/bin/python3',
+            'spark.yarn.appMasterEnv.PYSPARK_DRIVER_PYTHON': './.venv/bin/python3',
+        },
+
         trigger_rule=TriggerRule.ALL_DONE
     )
 
@@ -125,4 +155,3 @@ with DAG(
     )
 
     create_spark_cluster >> get_cluster_info >> spark_processing >> delete_spark_cluster >> delete_cluster_using_bash
-
