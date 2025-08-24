@@ -35,3 +35,9 @@ compute: create_manager
 sync_dags:
 	rsync -a dags/ ubuntu@ya_proxy:/home/ubuntu/dags/ && \
 	ssh ubuntu@ya_proxy "sudo chown -R ubuntu:ubuntu /home/ubuntu/dags"
+
+build_publish_venv:
+	python3 -m uv build
+	yc storage s3 cp ./dist/ s3://brusia-bucket/src/pypi/
+	bash src/utils/make_venv.sh
+	yc storage s3 cp ./venvs/venv.tar.gz s3://brusia-bucket/src/venvs/venv.tar.gz
