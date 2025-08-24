@@ -38,6 +38,6 @@ sync_dags:
 
 build_publish_venv:
 	python3 -m uv build
-	yc storage s3 cp ./dist/ s3://brusia-bucket/src/pypi/
+	for filename in ./OTUS-MLOps/dist/*; do yc storage s3 cp $filename s3://brusia-bucket/src/pypi/$(basename $filename); done
 	bash src/utils/make_venv.sh
 	yc storage s3 cp ./venvs/venv.tar.gz s3://brusia-bucket/src/venvs/venv.tar.gz
