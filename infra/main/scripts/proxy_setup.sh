@@ -70,10 +70,10 @@ echo -e "S3_ACCESS_KEY=${access_key}" >> .env
 echo -e "S3_SECRET_KEY=${secret_key}" >> .env
 echo -e "S3_BUCKET_NAME=${s3_bucket}" >> .env
 echo -e "S3_ENDPOINT_URL=https://storage.yandexcloud.net" >> .env
-echo -e "MLFLOW_S3_ENDPOINT_URL=${S3_ENDPOINT_URL}" >> .env
+echo -e "MLFLOW_S3_ENDPOINT_URL=https://storage.yandexcloud.net" >> .env
 echo -e "MLFLOW_TRACKING_URI=http://127.0.0.1:5000" >> .env
-echo -e "AWS_ACCESS_KEY_ID=${S3_ACCESS_KEY}" >> .env
-echo -e "AWS_SECRET_ACCESS_KEY=${S3_SECRET_KEY}" >> .env
+echo -e "AWS_ACCESS_KEY_ID=${access_key}" >> .env
+echo -e "AWS_SECRET_ACCESS_KEY=${secret_key}" >> .env
 
 AIRFLOW_UID=50000
 
