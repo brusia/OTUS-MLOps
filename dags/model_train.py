@@ -42,10 +42,9 @@ DP_SECURITY_GROUP_ID = Variable.get("DP_SECURITY_GROUP_ID")
 INPUT_DATA_DIR: Final[str] = "data/raw"
 
 MLFLOW_TRACKING_URI = Variable.get("MLFLOW_TRACKING_URI")
-MLFLOW_EXPERIMENT_NAME = "test-mlflow-experiment-train"
+MLFLOW_EXPERIMENT_NAME = "mlflow-experiment-train"
 
 S3_INPUT_DATA_BUCKET = f"s3a://{S3_BUCKET_NAME}/test/input_data"
-# S3_OUTPUT_MODEL_BUCKET = f"s3a://{S3_BUCKET_NAME}/test/models"
 S3_SRC_BUCKET = f"s3a://{S3_BUCKET_NAME}/src"
 S3_DP_LOGS_BUCKET = f"s3a://{S3_BUCKET_NAME}/test/logs/airflow_logs/"
 S3_VENV_ARCHIVE = f"s3a://{S3_BUCKET_NAME}/src/venvs/venv.tar.gz"

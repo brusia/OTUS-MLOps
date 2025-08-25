@@ -6,6 +6,8 @@ from argparse import ArgumentParser
 from pathlib import Path
 from typing import Final, Union, Any
 
+from pyspark.sql import functions as F
+
 
 from pyspark.sql import SparkSession
 from pyspark.sql import functions as F

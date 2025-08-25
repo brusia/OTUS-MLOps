@@ -6,7 +6,9 @@ Description: PySpark script for training a fraud detection model and logging to 
 from datetime import datetime
 import os
 from pathlib import Path
+import subprocess
 import sys
+import time
 import traceback
 import argparse
 from typing import Any, Final, List, Union
@@ -22,29 +24,34 @@ from pyspark.ml.tuning import ParamGridBuilder, CrossValidator
 import logging
 import boto3
 
+from pyspark.sql import functions as F
+
 _logger = logging.getLogger(__name__)
 
 BUCKET_NAME: Final[str] = "brusia-bucket"
-INPUT_DATA_DIR: Final[str] = "data/processed_with_airlow"
-OUTPUT_MODELS_DIR: Final[str] = "models/fraud_detection"
+INPUT_DATA_DIR: Final[str] = "data/processed_with_airlow/"
+
+OUTPUT_MODELS_DIR: Final[str] = "models/fraud_detection/"
 DATE_FORMAT: Final[str] = "%Y%m%d"
 
 
 TARGET_COLUMN_NAMES: List[str] = ["tx_fraud", "tx_fraud_scenario"]
 
 
-def get_next_file_to_process(s3_client: Any) -> Union[Path, None]:
-    input_files = [Path(obj['Key']) for obj in s3_client.list_objects(Bucket=BUCKET_NAME, Prefix=INPUT_DATA_DIR, Delimiter='/').get('CommonPrefixes', [])]
-    processed_files = sorted([Path(obj['Prefix']).relative_to(OUTPUT_MODELS_DIR).as_posix() for obj in s3_client.list_objects(Bucket=BUCKET_NAME, Prefix=OUTPUT_MODELS_DIR, Delimiter='/').get('CommonPrefixes', [])])
+def get_next_file_to_process(s3_client: Any) -> Union[str, None]:
+    input_files = sorted([Path(obj["Prefix"]).relative_to(INPUT_DATA_DIR) for obj in s3_client.list_objects(Bucket=BUCKET_NAME, Prefix=INPUT_DATA_DIR, Delimiter='/').get("CommonPrefixes", {})])
+    processed_files = sorted([Path(obj['Prefix']).relative_to(OUTPUT_MODELS_DIR).as_posix() for obj in s3_client.list_objects(Bucket=BUCKET_NAME, 
+    Prefix=OUTPUT_MODELS_DIR, Delimiter='/').get('CommonPrefixes', [])])
     last_date_processed = processed_files[-1] if processed_files else None
 
     next_file_index = list(map(lambda x: x.stem, input_files)).index(last_date_processed) + 1 if last_date_processed else 0
     if next_file_index < len(input_files):
         next_file= input_files[next_file_index]
-        return next_file
+        return next_file.as_posix()
     else:
-        _logger.info("All the data processed. There are no data to process.")
+        # _logger.info("All the data processed. There are no data to process.")
         return None
+
 
 def create_spark_session(s3_config=None):
     """
@@ -63,17 +70,16 @@ def create_spark_session(s3_config=None):
     """
     _logger.debug("Start to create Spark-session")
     try:
-        # Создаем базовый Builder
         builder = (SparkSession
             .builder
             .appName("FraudDetectionModel")
         )
 
-        # Если передана конфигурация S3, добавляем настройки
         if s3_config and all(k in s3_config for k in ['endpoint_url', 'access_key', 'secret_key']):
             _logger.debug(f"Conifgure S3 withendpoint_url: {s3_config['endpoint_url']}")
             builder = (builder
                 .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
+                # .config("spark.hadoop.mapreduce.fileoutputcommitter.algorithm.version", "2")
                 .config("spark.hadoop.fs.s3a.endpoint", s3_config['endpoint_url'])
                 .config("spark.hadoop.fs.s3a.access.key", s3_config['access_key'])
                 .config("spark.hadoop.fs.s3a.secret.key", s3_config['secret_key'])
@@ -86,7 +92,7 @@ def create_spark_session(s3_config=None):
         return builder
     except Exception as e: 
         _logger.exception("Error with session create")
-        raise
+        raise e
 
 
 def load_data(spark, input_path):
@@ -107,25 +113,18 @@ def load_data(spark, input_path):
     """
     _logger.debug("Start loading data from %s", input_path)
     try:
-        # Load the data
         _logger.debug("Read parquet %s", input_path)
-        df = spark.read.parquet(input_path, header=True, inferSchema=True)
 
-        # # Print schema and basic statistics
-        _logger.debug("Dataset Schema:")
-        _logger.debug(df.printSchema())
-        
-        _logger.debug("Total records: %s", df.count())
-        # Split the data into training and testing sets
-        _logger.debug("Splitting dataset into train and test sets")
+        file_path = f"s3a://{Path(BUCKET_NAME).joinpath(INPUT_DATA_DIR, input_path).as_posix()}"
+
+        df = spark.read.parquet(file_path)
+
         train_df, test_df = df.randomSplit([0.8, 0.2], seed=42)
-        _logger.debug("Training set size: %s", train_df.count())
-        _logger.debug("Testing set size: %s", test_df.count())
-
+       
         return train_df, test_df
     except Exception as e:
         _logger.exception("Error while loading data.")
-        raise
+        raise e
 
 
 def prepare_features(train_df, test_df):
@@ -149,8 +148,10 @@ def prepare_features(train_df, test_df):
         _logger.debug("Check columns types")
         dtypes = dict(train_df.dtypes)
 
-        feature_cols = [col for col in train_df.columns
-                        if col not in TARGET_COLUMN_NAMES and dtypes[col] != 'string']
+        feature_cols = ["tx_amount"]
+        
+                        # [col for col in train_df.columns
+                        # if col not in TARGET_COLUMN_NAMES and dtypes[col] != 'string']
 
         for col in train_df.columns:
             null_count = train_df.filter(train_df[col].isNull()).count()
@@ -186,6 +187,7 @@ def train_model(train_df, test_df, feature_cols, model_type="rf", run_name="frau
         (best_model, metrics) - Best model and its performance metrics
     """
     try:
+        # Create feature vector
         assembler = VectorAssembler(inputCols=feature_cols, outputCol="features_raw")
         scaler = StandardScaler(
             inputCol="features_raw",
@@ -194,8 +196,9 @@ def train_model(train_df, test_df, feature_cols, model_type="rf", run_name="frau
             withMean=True
         )
 
+        # Select model based on type
         classifier = RandomForestClassifier(
-            labelCol="fraud",
+            labelCol="tx_fraud",
             featuresCol="features",
             numTrees=10,
             maxDepth=5
@@ -205,26 +208,28 @@ def train_model(train_df, test_df, feature_cols, model_type="rf", run_name="frau
             .addGrid(classifier.maxDepth, [5, 10])
             .build()
         )
-        
+
+        # Create pipeline
         pipeline = Pipeline(stages=[assembler, scaler, classifier])
 
-        # тут можно сделать несколько оценциков для каждой целевой переменной (fraud, fraud_scenario)
+        # Create evaluators
         evaluator_auc = BinaryClassificationEvaluator(
-            labelCol="fraud",
+            labelCol="tx_fraud",
             rawPredictionCol="rawPrediction",
             metricName="areaUnderROC"
         )
         evaluator_acc = MulticlassClassificationEvaluator(
-            labelCol="fraud",
+            labelCol="tx_fraud",
             predictionCol="prediction",
             metricName="accuracy"
         )
         evaluator_f1 = MulticlassClassificationEvaluator(
-            labelCol="fraud",
+            labelCol="tx_fraud",
             predictionCol="prediction",
             metricName="f1"
         )
 
+        # Create cross-validator
         cv = CrossValidator(
             estimator=pipeline,
             estimatorParamMaps=param_grid,
@@ -232,38 +237,44 @@ def train_model(train_df, test_df, feature_cols, model_type="rf", run_name="frau
             numFolds=3
         )
 
+        # Start MLflow run
         with mlflow.start_run(run_name=run_name) as run:
             run_id = run.info.run_id
-           
+            print(f"MLflow Run ID: {run_id}")
+
+            # Log model parameters
             mlflow.log_param("numTrees_options", [10, 20])
             mlflow.log_param("maxDepth_options", [5, 10])
 
+            # Train the model
             cv_model = cv.fit(train_df)
             best_model = cv_model.bestModel
-            
+
+            # Make predictions on test data
             predictions = best_model.transform(test_df)
 
+            # Calculate metrics
             auc = evaluator_auc.evaluate(predictions)
             accuracy = evaluator_acc.evaluate(predictions)
             f1 = evaluator_f1.evaluate(predictions)
 
+            # Log metrics
             mlflow.log_metric("auc", auc)
             mlflow.log_metric("accuracy", accuracy)
             mlflow.log_metric("f1", f1)
 
+            # Log best model parameters
             rf_model = best_model.stages[-1]
             try:
                 num_trees = rf_model.getNumTrees
                 max_depth = rf_model.getMaxDepth()
-
+                print(f"DEBUG: numTrees={num_trees}, maxDepth={max_depth}")
                 mlflow.log_param("best_numTrees", num_trees)
                 mlflow.log_param("best_maxDepth", max_depth)
             except Exception as e:
-                _logger.exception("Model parameters are incorrect.")
-                for attr in dir(rf_model):
-                    if not attr.startswith('_'):
-                        _logger.error("Ploblem with attribute '%s'", attr)
+                pass
 
+            # Log the model
             mlflow.spark.log_model(best_model, "model")
 
             # Print metrics
@@ -280,11 +291,11 @@ def train_model(train_df, test_df, feature_cols, model_type="rf", run_name="frau
 
             return best_model, metrics
     except Exception as e:
-        _logger.exception("Error with model train")
-        raise e
+        mlflow.log_text(f"Traceback: {traceback.format_exc()}", "exception_while_training.txt")
+        raise
 
 
-def save_model(model, output_path):
+def save_model(model, data_path, s3_client):
     """
     Save the trained model to the specified path.
 
@@ -292,30 +303,22 @@ def save_model(model, output_path):
     ----------
     model : PipelineModel
         Trained model
-    output_path : str
-        Path to save the model
+    data_path: str
+        The part of path where the model will be saved
+    s3_client : boto3.Client
+        client to save model on S3 bucket
     """
+
     try:
-        model.write().overwrite().save(output_path)
+        model.write().overwrite().save(f"s3a://{Path(BUCKET_NAME).joinpath(OUTPUT_MODELS_DIR, data_path, f'model_{datetime.now().strftime(DATE_FORMAT)}')}")
+
     except Exception as e:
         _logger.exception("Error with saving model.")
+        mlflow.log_text(f"{e.with_traceback()}", "exeption_while_saving_model.txt")
         raise e
 
 
 def get_best_model_metrics(experiment_name):
-    """
-    Получает метрики лучшей модели из MLflow с алиасом 'champion'
-
-    Parameters
-    ----------
-    experiment_name : str
-        Имя эксперимента MLflow
-
-    Returns
-    -------
-    dict
-        Метрики лучшей модели или None, если модели нет
-    """
     client = MlflowClient()
 
     try:
@@ -324,6 +327,7 @@ def get_best_model_metrics(experiment_name):
             return None
     except Exception as e:
         _logger.exception("Error with getting exeriment.")
+        mlflow.log_text(f"{e.with_traceback()}", "exeption_while_gettings_experiment_for_best_model.txt")
         return None
 
     try:
@@ -361,25 +365,11 @@ def get_best_model_metrics(experiment_name):
         return metrics
     except Exception as e:
         _logger.exception("Error while getting best model.")
+        mlflow.log_text(f"{e.with_traceback()}", "exeption_while_getting_best_model.txt")
         return None
 
 
 def compare_and_register_model(new_metrics, experiment_name):
-    """
-    Сравнивает новую модель с лучшей в MLflow и регистрирует, если она лучше
-
-    Parameters
-    ----------
-    new_metrics : dict
-        Метрики новой модели
-    experiment_name : str
-        Имя эксперимента MLflow
-
-    Returns
-    -------
-    bool
-        True, если новая модель была зарегистрирована как лучшая
-    """
     client = MlflowClient()
     best_metrics = get_best_model_metrics(experiment_name)
     model_name = f"{experiment_name}_model"
@@ -471,15 +461,16 @@ def main():
         train_df, test_df = load_data(spark, data_path)
         train_df, test_df, feature_cols = prepare_features(train_df, test_df)
 
-        run_name = args.run_name or f"fraud_detection_{args.model_type}_{os.path.basename(args.input)}"
+        run_name = args.run_name or f"fraud_detection_{args.model_type}_{data_path}"
         model, metrics = train_model(train_df, test_df, feature_cols, args.model_type, run_name)
 
-        save_model(model, f"s3a://{Path(BUCKET_NAME).joinpath(OUTPUT_MODELS_DIR, data_path, f'model_{datetime.now().strftime(DATE_FORMAT)}')}")
+        save_model(model, data_path, s3_client)
 
         if args.auto_register:
             compare_and_register_model(metrics, args.experiment_name)
 
-    except Exception:
+    except Exception as ex:
+        mlflow.log_text(f"{ex.with_traceback()}", "model_train_exeption.txt")
         sys.exit(1)
     finally:
         spark.stop()

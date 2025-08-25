@@ -67,6 +67,7 @@ resource "yandex_compute_instance" "proxy" {
       access_key                  = var.storage_secrets.access_key
       secret_key                  = var.storage_secrets.secret_key
       s3_bucket                   = var.bucket_name
+      docker_compose_content = file("${path.root}/infra/src/docker-compose.yaml")
       # user_name                   = var.virtual_machine.user_name
       user_name = "ubuntu"
     #   dataproc_init_content = file("${path.root}/scripts/dataproc_setup_script.sh")

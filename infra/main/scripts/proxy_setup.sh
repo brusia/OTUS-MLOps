@@ -7,28 +7,6 @@ function log() {
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] [INFO] $1" | tee -a $HOME/user_data_execution.log
 }
 
-# Функция для копирования заданного файла в целевой бакет
-function copy_file() {
-    FILE_NAME=$1
-    SOURCE=$2
-    TARGET=$3
-    USER_NAME=$4
-    s3cmd cp \
-        --config=/home/$USER_NAME/.s3cfg \
-        --acl-public \
-        s3://$SOURCE/$FILE_NAME \
-        s3://$TARGET/$FILE_NAME
-
-    # Проверяем успешность копирования
-    if [ $? -eq 0 ]; then
-        log "Listing contents of $TARGET"
-        s3cmd ls --config=/home/$USER_NAME/.s3cfg s3://$TARGET/
-    else
-        log "Error occurred while copying file "$FILE_NAME" to "$TARGET
-    fi
-}
-
-
 log "Starting user data script execution"
 log "VM user name: ${user_name}"
 
@@ -79,32 +57,25 @@ echo 'export S3_BUCKET_NAME="${s3_bucket}"' >> $HOME/.bashrc
 
 # source $HOME/.bashrc
 
-# Поднимаем apache airflow сервер
-# TODO: здесь можно будет поменять на свой docker-compose, выкинуть лишние сервисы БД либо переконфигурировать в соответствии с нашими требованиями, а скачивать по ссылке с s3 (передавать как аргумент terraform при инициализации)
+# Поднимаем всю инфораструктуру из docker-compose
 log "Downloading docker-compose file"
 cd $HOME
-curl -LfO 'https://airflow.apache.org/docs/apache-airflow/3.0.3/docker-compose.yaml'
+echo '${docker_compose_content}' > /home/ubuntu/docker-compose.yaml
+
+log "Setting up infrastructure"
 mkdir -p ./dags ./logs ./plugins ./config
 chown ${user_name}:${user_name} ./dags ./logs ./plugins ./config docker-compose.yaml
 echo -e "AIRFLOW_UID=$(id -u)" >> .env
 echo -e "S3_ACCESS_KEY=${access_key}" >> .env
 echo -e "S3_SECRET_KEY=${secret_key}" >> .env
 echo -e "S3_BUCKET_NAME=${s3_bucket}" >> .env
+echo -e "S3_ENDPOINT_URL=https://storage.yandexcloud.net" >> .env
+echo -e "MLFLOW_S3_ENDPOINT_URL=${S3_ENDPOINT_URL}" >> .env
+echo -e "MLFLOW_TRACKING_URI=http://127.0.0.1:5000" >> .env
+echo -e "AWS_ACCESS_KEY_ID=${S3_ACCESS_KEY}" >> .env
+echo -e "AWS_SECRET_ACCESS_KEY=${S3_SECRET_KEY}" >> .env
+
 AIRFLOW_UID=50000
+
+source .env
 docker compose up &
-
-source $HOME/.bashrc
-
-# docker compose run airflow-cli airflow
-
-log "I'm here. I'm done."
-
-# TODO: здесь нужно создать airflow
-# скрипты
-
-
-# настроить его расписание
-
-# а он уже сам пусть создаёт из terraform наш dataproc
-
-# дальше был код, теперь он пусть исполняется из airflow (первого шага)
