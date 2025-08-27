@@ -6,16 +6,12 @@ Description: PySpark script for training a fraud detection model and logging to 
 from datetime import datetime
 import os
 from pathlib import Path
-import subprocess
 import sys
-import time
 import traceback
 import argparse
 from typing import Any, Final, List, Union
 import mlflow
 import mlflow.spark
-from mlflow.tracking import MlflowClient
-from pyspark.sql import SparkSession
 from pyspark.ml import Pipeline
 from pyspark.ml.feature import VectorAssembler, StandardScaler
 from pyspark.ml.classification import RandomForestClassifier
@@ -23,6 +19,8 @@ from pyspark.ml.evaluation import BinaryClassificationEvaluator, MulticlassClass
 from pyspark.ml.tuning import ParamGridBuilder, CrossValidator
 import logging
 import boto3
+
+from otus_mlops.helpers.common import create_spark_session, load_data, prepare_features
 
 from pyspark.sql import functions as F
 
@@ -51,117 +49,6 @@ def get_next_file_to_process(s3_client: Any) -> Union[str, None]:
     else:
         # _logger.info("All the data processed. There are no data to process.")
         return None
-
-
-def create_spark_session(s3_config=None):
-    """
-    Create and configure a Spark session.
-
-    Parameters
-    ----------
-    s3_config : dict, optional
-        Dictionary containing S3 configuration parameters
-        (endpoint_url, access_key, secret_key)
-
-    Returns
-    -------
-    SparkSession
-        Configured Spark session
-    """
-    _logger.debug("Start to create Spark-session")
-    try:
-        builder = (SparkSession
-            .builder
-            .appName("FraudDetectionModel")
-        )
-
-        if s3_config and all(k in s3_config for k in ['endpoint_url', 'access_key', 'secret_key']):
-            _logger.debug(f"Conifgure S3 withendpoint_url: {s3_config['endpoint_url']}")
-            builder = (builder
-                .config("spark.hadoop.fs.s3a.impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
-                # .config("spark.hadoop.mapreduce.fileoutputcommitter.algorithm.version", "2")
-                .config("spark.hadoop.fs.s3a.endpoint", s3_config['endpoint_url'])
-                .config("spark.hadoop.fs.s3a.access.key", s3_config['access_key'])
-                .config("spark.hadoop.fs.s3a.secret.key", s3_config['secret_key'])
-                .config("spark.hadoop.fs.s3a.path.style.access", "true")
-                .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "true")
-            )
-
-        _logger.debug("Spark session configured successfully")
-        
-        return builder
-    except Exception as e: 
-        _logger.exception("Error with session create")
-        raise e
-
-
-def load_data(spark, input_path):
-    """
-    Load and prepare the fraud detection dataset.
-
-    Parameters
-    ----------
-    spark : SparkSession
-        Spark session
-    input_path : str
-        Path to the input data
-
-    Returns
-    -------
-    tuple
-        (train_df, test_df) - Spark DataFrames for training and testing
-    """
-    _logger.debug("Start loading data from %s", input_path)
-    try:
-        _logger.debug("Read parquet %s", input_path)
-
-        file_path = f"s3a://{Path(BUCKET_NAME).joinpath(INPUT_DATA_DIR, input_path).as_posix()}"
-
-        df = spark.read.parquet(file_path)
-
-        train_df, test_df = df.randomSplit([0.8, 0.2], seed=42)
-       
-        return train_df, test_df
-    except Exception as e:
-        _logger.exception("Error while loading data.")
-        raise e
-
-
-def prepare_features(train_df, test_df):
-    """
-    Prepare features for model training.
-
-    Parameters
-    ----------
-    train_df : DataFrame
-        Training DataFrame
-    test_df : DataFrame
-        Testing DataFrame
-
-    Returns
-    -------
-    tuple
-        (train_df, test_df, feature_cols) - Prepared DataFrames and feature column names
-    """
-    _logger.debug("Prepare features")
-    try:
-        _logger.debug("Check columns types")
-        dtypes = dict(train_df.dtypes)
-
-        feature_cols = ["tx_amount"]
-        
-                        # [col for col in train_df.columns
-                        # if col not in TARGET_COLUMN_NAMES and dtypes[col] != 'string']
-
-        for col in train_df.columns:
-            null_count = train_df.filter(train_df[col].isNull()).count()
-            if null_count > 0:
-                _logger.warning("Column '%s' contains '%d' null values", col, null_count)
-
-        return train_df, test_df, feature_cols
-    except Exception as e:
-        _logger.exception("Error with features prepare.")
-        raise e
 
 
 def train_model(train_df, test_df, feature_cols, model_type="rf", run_name="fraud_detection_model"):
@@ -310,109 +197,12 @@ def save_model(model, data_path, s3_client):
     """
 
     try:
-        model.write().overwrite().save(f"s3a://{Path(BUCKET_NAME).joinpath(OUTPUT_MODELS_DIR, data_path, f'model_{datetime.now().strftime(DATE_FORMAT)}')}")
+        mlflow.spark.save_model(model, f"s3a://{Path(BUCKET_NAME).joinpath(OUTPUT_MODELS_DIR, data_path, f'model_{datetime.now().strftime(DATE_FORMAT)}')}")
 
     except Exception as e:
         _logger.exception("Error with saving model.")
         mlflow.log_text(f"{e.with_traceback()}", "exeption_while_saving_model.txt")
         raise e
-
-
-def get_best_model_metrics(experiment_name):
-    client = MlflowClient()
-
-    try:
-        experiment = client.get_experiment_by_name(experiment_name)
-        if not experiment:
-            return None
-    except Exception as e:
-        _logger.exception("Error with getting exeriment.")
-        mlflow.log_text(f"{e.with_traceback()}", "exeption_while_gettings_experiment_for_best_model.txt")
-        return None
-
-    try:
-        model_name = f"{experiment_name}_model"
-
-        try:
-            registered_model = client.get_registered_model(model_name)
-        except Exception as e:
-            return None
-
-        model_versions = client.get_latest_versions(model_name)
-        champion_version = None
-
-        for version in model_versions:
-            if hasattr(version, 'aliases') and "champion" in version.aliases:
-                champion_version = version
-                break
-            elif hasattr(version, 'tags') and version.tags.get('alias') == "champion":
-                champion_version = version
-                break
-
-        if not champion_version:
-            return None
-
-        champion_run_id = champion_version.run_id
-
-        run = client.get_run(champion_run_id)
-        metrics = {
-            "run_id": champion_run_id,
-            "auc": run.data.metrics["auc"],
-            "accuracy": run.data.metrics["accuracy"],
-            "f1": run.data.metrics["f1"]
-        }
-
-        return metrics
-    except Exception as e:
-        _logger.exception("Error while getting best model.")
-        mlflow.log_text(f"{e.with_traceback()}", "exeption_while_getting_best_model.txt")
-        return None
-
-
-def compare_and_register_model(new_metrics, experiment_name):
-    client = MlflowClient()
-    best_metrics = get_best_model_metrics(experiment_name)
-    model_name = f"{experiment_name}_model"
-
-    try:
-        client.get_registered_model(model_name)
-    except Exception as e:
-        client.create_registered_model(model_name)
-
-    run_id = new_metrics["run_id"]
-    model_uri = f"runs:/{run_id}/model"
-    model_details = mlflow.register_model(model_uri, model_name)
-    new_version = model_details.version
-
-    should_promote = False
-
-    if not best_metrics:
-        should_promote = True
-    else:
-        if new_metrics["auc"] > best_metrics["auc"]:
-            should_promote = True
-            improvement = (new_metrics["auc"] - best_metrics["auc"]) / best_metrics["auc"] * 100
-
-    if should_promote:
-        try:
-            if hasattr(client, 'set_registered_model_alias'):
-                client.set_registered_model_alias(model_name, "champion", new_version)
-            else:
-                client.set_model_version_tag(model_name, new_version, "alias", "champion")
-        except Exception as e:
-            client.set_model_version_tag(model_name, new_version, "alias", "champion")
-
-        return True
-
-    try:
-        if hasattr(client, 'set_registered_model_alias'):
-            client.set_registered_model_alias(model_name, "challenger", new_version)
-        else:
-            client.set_model_version_tag(model_name, new_version, "alias", "challenger")
-    except Exception as e:
-        client.set_model_version_tag(model_name, new_version, "alias", "challenger")
-
-    return False
 
 
 def main():
@@ -462,12 +252,14 @@ def main():
         train_df, test_df, feature_cols = prepare_features(train_df, test_df)
 
         run_name = args.run_name or f"fraud_detection_{args.model_type}_{data_path}"
-        model, metrics = train_model(train_df, test_df, feature_cols, args.model_type, run_name)
 
-        save_model(model, data_path, s3_client)
+        mlflow.log_text("success", "success.txt")
+        # model, metrics = train_model(train_df, test_df, feature_cols, args.model_type, run_name)
+# 
+        # save_model(model, data_path, s3_client)
 
-        if args.auto_register:
-            compare_and_register_model(metrics, args.experiment_name)
+        # if args.auto_register:
+            # compare_and_register_model(metrics, args.experiment_name)
 
     except Exception as ex:
         mlflow.log_text(f"{ex.with_traceback()}", "model_train_exeption.txt")
