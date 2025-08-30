@@ -107,13 +107,6 @@ with DAG(
 
         # software
         services=["YARN", "SPARK", "HDFS", "MAPREDUCE"],
-        # initialization_actions = [ 
-        #     InitializationAction(uri = f"s3a://{S3_BUCKET_NAME}/scripts/prepare_cluster.sh",
-        #         timeout=700,
-        #         args=[]
-        #         # args=[S3_ACCESS_KEY, S3_SECRET_KEY]
-        #         )
-        #     ]
     )
 
 
@@ -155,7 +148,6 @@ with DAG(
         args=[
             "--tracking-uri", MLFLOW_TRACKING_URI,
             "--experiment-name", MLFLOW_OPT_EXPERIMENT_NAME,
-            "--auto-register",
             "--s3-endpoint-url", S3_ENDPOINT_URL,
             "--s3-access-key", S3_ACCESS_KEY,
             "--s3-secret-key", S3_SECRET_KEY,
