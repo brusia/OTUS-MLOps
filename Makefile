@@ -37,7 +37,9 @@ sync_dags:
 	ssh ubuntu@ya_proxy "sudo chown -R ubuntu:ubuntu /home/ubuntu/dags"
 
 build_publish_venv:
-	python3 -m uv build
+	rm -rf venvs/
+	rm -rf OTUS-MLOps/dist
+	python3 -m uv build --project OTUS-MLOps
 	for filename in ./OTUS-MLOps/dist/*; do yc storage s3 cp $filename s3://brusia-bucket/src/pypi/$(basename $filename); done
-	bash src/utils/make_venv.sh
+	bash OTUS-MLOps/src/utils/make_venv.sh
 	yc storage s3 cp ./venvs/venv.tar.gz s3://brusia-bucket/src/venvs/venv.tar.gz
