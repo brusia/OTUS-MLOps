@@ -130,7 +130,7 @@ def load_data(spark, input_path):
 
         file_path = f"s3a://{Path(BUCKET_NAME).joinpath(INPUT_DATA_DIR, input_path).as_posix()}"
 
-        df = spark.read.parquet(file_path).sample(0.2)
+        df = spark.read.parquet(file_path)
 
         class_weights = calculate_class_weights(df, "tx_fraud")
 
@@ -449,17 +449,13 @@ def optimize_hyperparameters(spark, df_train, df_test, feature_cols):
         'maxDepth': hp.quniform('maxDepth', 5, 15, 1),
         'maxBins': hp.quniform('maxBins', 20, 50, 5),
         'minInstancesPerNode': hp.quniform('minInstancesPerNode', 1, 10, 1),
-        # for debug
-        # 'numTrees': hp.quniform('numTrees', 50, 100, 10),
-        # 'maxDepth': hp.quniform('maxDepth', 5, 15, 1),
-        # 'maxBins': hp.quniform('maxBins', 20, 50, 15),
         'minInstancesPerNode': hp.quniform('minInstancesPerNode', 1, 10, 1),
         'subsamplingRate': hp.uniform('subsamplingRate', 0.6, 1.0),
         'featureSubsetStrategy': hp.choice('featureSubsetStrategy', ['auto', 'sqrt', 'log2']),
         'impurity': hp.choice('impurity', ['gini', 'entropy'])
     }
 
-    spark_trials = Trials()
+    spark_trials = SparkTrials()
     # mlflow.log_text(f"trials: {spark_trials}", "optimize_2.txt")
     # Запуск оптимизации
     print("Запуск оптимизации гиперпараметров...")
