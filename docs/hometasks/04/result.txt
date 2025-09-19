@@ -1,0 +1,26 @@
+
+--- Create entity ---
+   driver_id     event_timestamp  conv_rate_coef  acc_rate_coef
+0       1001 2021-04-12 10:59:42             2.5            1.2
+1       1002 2021-04-12 08:12:10             0.3            0.7
+2       1003 2021-04-12 16:40:26             2.0           15.0
+
+--- Historical features ---
+   driver_id           event_timestamp  conv_rate_coef  acc_rate_coef  conv_rate  acc_rate  productivity  linear_combination
+0       1001 2021-04-12 10:59:42+00:00             2.5            1.2   0.731652  0.865659    122.238681            2.867921
+1       1002 2021-04-12 08:12:10+00:00             0.3            0.7   0.841482  0.702492     11.231548            0.744189
+2       1003 2021-04-12 16:40:26+00:00             2.0           15.0   0.898103  0.751486    241.618530           13.068497
+
+Feature view metadata:
+Name: driver_quality_metrics
+Entities: ['driver']
+TTL: 2 days, 0:00:00
+Online: True
+Features: ['conv_rate', 'acc_rate']
+
+Feature view metadata:
+Name: driver_productivity_metrics
+Entities: ['driver']
+TTL: 7 days, 0:00:00
+Online: True
+Features: ['productivity']
