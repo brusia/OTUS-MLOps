@@ -24,10 +24,10 @@
 
 feast ui в браузере:
 
-[Источники данных](docs/hometasks/04/data_sources.png)
-[Добавленный feature service](docs/hometasks/04/feat_service_linear.png)
-[Доступные feature-views](docs/hometasks/04/feature_views.png)
-[Доступные признаки](docs/hometasks/04/features.png)
+- [Источники данных](docs/hometasks/04/data_sources.png)
+- [Добавленный feature service](docs/hometasks/04/feat_service_linear.png)
+- [Доступные feature-views](docs/hometasks/04/feature_views.png)
+- [Доступные признаки](docs/hometasks/04/features.png)
 
 ### Пример
 
@@ -50,13 +50,13 @@ feast ui в браузере:
 Актуальное задание (для проверки) будет размещено в текущей версии README.md
 Список предыдущих заданий
 
-[Hometask 1](docs/hometasks//01/hometask1.md)
-[Hometask 2](docs/hometasks/02/hometask2.md)
-[Hometask 3](docs/hometasks/03/hometask3.md)
-[Hometask 4](docs/hometasks/04/hometask04.md)
-[Hometask 5](docs/hometasks/05/hometask5.md)
-[Hometask 6](docs/hometasks/06/hometask06.md)
-[Hometask 7](docs/hometasks/07/hometask07.md)
+- [Hometask 1](docs/hometasks//01/hometask1.md)
+- [Hometask 2](docs/hometasks/02/hometask2.md)
+- [Hometask 3](docs/hometasks/03/hometask3.md)
+- [Hometask 4](docs/hometasks/04/hometask04.md)
+- [Hometask 5](docs/hometasks/05/hometask5.md)
+- [Hometask 6](docs/hometasks/06/hometask06.md)
+- [Hometask 7](docs/hometasks/07/hometask07.md)
 
 Статусы задач поддерживаются в актуальном состоянии на протяжении всей работы. Kandan-доска доступна по ссылке:
 

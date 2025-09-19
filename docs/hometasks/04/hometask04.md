@@ -18,10 +18,10 @@
 
 feast ui в браузере:
 
-[Источники данных](docs/hometasks/04/data_sources.png)
-[Добавленный feature service](docs/hometasks/04/feat_service_linear.png)
-[Доступные feature-views](docs/hometasks/04/feature_views.png)
-[Доступные признаки](docs/hometasks/04/features.png)
+- [Источники данных](docs/hometasks/04/data_sources.png)
+- [Добавленный feature service](docs/hometasks/04/feat_service_linear.png)
+- [Доступные feature-views](docs/hometasks/04/feature_views.png)
+- [Доступные признаки](docs/hometasks/04/features.png)
 
 ## Пример
 
