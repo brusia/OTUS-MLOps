@@ -1,0 +1,6 @@
+image:
+  repository: "brusia/fastapi-fraud"
+  tag: "6b306d622f48b48f7514ca48d4f01999cd2e881f"
+aws:
+  access: "$AWS_ACCESS_KEY_ID"
+  secret: "$AWS_SECRET_ACCESS_KEY"
