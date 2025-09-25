@@ -59,26 +59,23 @@ resource "yandex_compute_instance" "proxy" {
   metadata = {
     # ssh-keys = "${var.virtual_machine.user_name}:${file(var.ssh_key.public_key_path)}"
     ssh-keys = "ubuntu:${file(var.ssh_key.public_key_path)}"
-    user-data = templatefile("${path.root}/scrits/setup_feature_store.sh",
-      { git_repo = var.git.repo
-        feature_repo_path = "OTUS-MLOps/feature-store/otus_mlops_feature_store/feature_repo" })
-    # user-data = templatefile("${path.root}/scripts/proxy_setup.sh", {
-    #   token                       = var.cloud_auth.token
-    #   cloud_id                    = var.cloud_auth.cloud_id
-    #   folder_id                   = var.cloud_auth.folder_id
-    #   private_key                 = file(var.ssh_key.private_key_path)
-    #   access_key                  = var.storage_secrets.access_key
-    #   secret_key                  = var.storage_secrets.secret_key
-    #   s3_bucket                   = var.bucket_name
-    #   docker_compose_content = file("${path.root}/../src/docker-compose.yaml")
-    #   # user_name                   = var.virtual_machine.user_name
-    #   user_name = "ubuntu"
+    user-data = templatefile("${path.root}/scripts/kube_setup.sh", {
+    #  token                       = var.cloud_auth.token
+    #  cloud_id                    = var.cloud_auth.cloud_id
+    #  folder_id                   = var.cloud_auth.folder_id
+    #  private_key                 = file(var.ssh_key.private_key_path)
+      access_key                  = var.storage_secrets.access_key
+      secret_key                  = var.storage_secrets.secret_key
+    #  s3_bucket                   = var.bucket_name
+    #  docker_compose_content = file("${path.root}/../src/docker-compose.yaml")
+      # user_name                   = var.virtual_machine.user_name
+    #  user_name = "ubuntu"
     #   dataproc_init_content = file("${path.root}/scripts/dataproc_setup_script.sh")
       # git_user                    = var.git_user
     #   git_repo                    = var.git.repo
     #   git_branch = var.git.branch
     #   git_token                   = var.git.token
-    # })
+    })
   }
 
   scheduling_policy {

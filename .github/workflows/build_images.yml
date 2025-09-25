@@ -1,0 +1,55 @@
+name: Build images
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - src/otus_mlops/fast_api/**
+      - infra/fastapi/Dockerfile
+      - .github/workflows/build_images.yml
+  pull_request:
+    branches:
+      - main
+    paths:
+      - src/otus_mlops/fast_api/**
+      - infra/fastapi/Dockerfile
+      - .github/workflows/build_images.yml
+
+env:
+  DOCKER_HUB_USER: brusia
+  DOCKER_HUB_ACCESS_TOKEN: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+  IMAGE_NAME: brusia/fastapi-fraud:${{ github.sha }}
+
+jobs:
+  lint:
+    name: Lint images
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - uses: hadolint/hadolint-action@v3.1.0
+      with:
+        dockerfile: infra/fastapi/Dockerfile
+
+  build_and_push:
+    name: Build image for fast-api application (fraud detection) and push to registry
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v2
+    - name: Checkout repository
+      run: ls -la
+    - name: Build Docker image
+      env:
+            # AWS_S3_BUCKET: ${{ env.S3_BUCKET }}
+            AWS_ACCESS_KEY_ID: ${{ env.S3_ACCESS_KEY_ID }}
+            AWS_SECRET_ACCESS_KEY: ${{ env.S3_SECRET_ACCESS_KEY }}
+            # AWS_S3_ENDPOINT: ${{ env.S3_ENDPOINT }}
+      run: docker build -f infra/fastapi/Dockerfile -t ${{ env.IMAGE_NAME }} .
+    - name: Login to Docker Hub
+      uses: docker/login-action@v1
+      with:
+        username: ${{ env.DOCKER_HUB_USER }}
+        password: ${{ env.DOCKER_HUB_ACCESS_TOKEN }}
+    - name: Push image to Docker Hub
+      run: docker push ${{ env.IMAGE_NAME }}

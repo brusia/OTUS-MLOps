@@ -16,6 +16,9 @@ env:
   S3_ACCESS_KEY_ID: ${{ secrets.S3_ACCESS_KEY }}
   S3_SECRET_ACCESS_KEY: ${{ secrets.S3_SECRET_KEY }}
   S3_ENDPOINT: ${{ secrets.S3_ENDPOINT_URL }}
+  DOCKER_HUB_USER: brusia
+  DOCKER_HUB_ACCESS_TOKEN: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+  IMAGE_NAME: brusia/fastapi-fraud:${{ github.sha }}
 
 jobs:
   upload-src:
