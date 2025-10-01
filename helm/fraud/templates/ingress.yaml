@@ -1,0 +1,33 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: fraud
+  namespace: fraud
+  labels:
+    app: fraud
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: fraud
+                port:
+                  number: 80
+          - path: /predict
+            pathType: Prefix
+            backend:
+              service:
+                name: fraud
+                port:
+                  number: 80
+          - path: /predict_scenario
+            pathType: Prefix
+            backend:
+              service:
+                name: fraud
+                port:
+                  number: 80
