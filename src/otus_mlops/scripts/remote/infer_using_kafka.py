@@ -10,7 +10,7 @@ import sys
 import argparse
 from typing import Any, Final, List, Union
 
-from pyspark.sql import SparkSession
+from pyspark.sql import SparkSession, Row
 from kafka import KafkaConsumer, KafkaProducer
 import mlflow
 import mlflow.spark
@@ -134,11 +134,8 @@ def infer():
 
     mlflow.set_experiment(args.experiment_name)
 
-    mlflow.log_text(f"argparse args: {args}", "kafka_1.txt")
-
     spark = create_spark_session(s3_config).getOrCreate()
 
-    mlflow.log_text(f"spark session was created", "kafka_2.txt")
     try:
 
         consumer = KafkaConsumer(
@@ -149,12 +146,10 @@ def infer():
                 enable_auto_commit=False,
             )
 
-
-        mlflow.log_text("consumer", "kafka_3.txt")
         topic = args.topic
         partitions = consumer.partitions_for_topic(topic)
+
         if partitions is None:
-            print("No partitions found for topic")
             return
 
         consumer.subscribe(topics=[args.topic])
@@ -163,8 +158,6 @@ def infer():
             mlflow.log_text("cannot load model", "kafka__exception.txt")
             sys.exit(1)
 
-
-        mlflow.log_text("load model", "kafka_4.txt")
         producer = KafkaProducer(
             bootstrap_servers=args.bootstrap_server,
             value_serializer=lambda msg: json.dumps(msg).encode("utf-8"),
@@ -174,20 +167,13 @@ def infer():
             api_version=(2, 0, 2),
         )
 
-        mlflow.log_text("producer", "kafka_5.txt")
-
         start = datetime.now()
-        for count in range(10):
+        for _ in range(10):
             msg = next(consumer)
 
-            mlflow.log_text("producer", f"kafka_get_message_{count}.txt")
-            input_data = msg.value
-
-            mlflow.log_text(f"{input_data}", f"kafka_message_{count}.txt")
+            input_data = spark.createDataFrame([Row(**msg.value)])
             res = model.transform(input_data).collect()[0].asDict()
     
-            mlflow.log_text(f"{res}", f"kafka_transform_{count}.txt")
-
             producer.send(
                 topic="inference_results",
                 value=res,
@@ -198,8 +184,6 @@ def infer():
         mlflow.log_text(f"Model performance is '{performance}' entity per second", "kafka_perf.txt")
         producer.flush()
         producer.close()
-
-        mlflow.log_text("done", "kafka_6.txt")
 
     except Exception as ex:
         mlflow.log_text(f"{ex.with_traceback()}", "kafka_processing_exeption.txt")

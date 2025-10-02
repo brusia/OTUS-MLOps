@@ -23,7 +23,7 @@ def main():
     )
 
     args = argparser.parse_args()
-
+    
     consumer = KafkaConsumer(
         bootstrap_servers=args.bootstrap_server,
         group_id=args.group_id,

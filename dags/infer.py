@@ -71,7 +71,7 @@ def get_cluster_id_from_xcom(**kwargs):
 
 
 with DAG(
-    dag_id="testing-train-model",
+    dag_id="inference-with-kafka",
     start_date=datetime(year=2025, month=8, day=3),
     # schedule=timedelta(days=1),
     catchup=False
@@ -131,7 +131,7 @@ with DAG(
             "--s3-access-key", S3_ACCESS_KEY,
             "--s3-secret-key", S3_SECRET_KEY,
             "-n", 5000,
-            "--bootstrap_server", KAFKA_BOOTSTRAP_URI,
+            "--bootstrap-server", KAFKA_BOOTSTRAP_URI,
             "--run-name", f"inference_{datetime.now().strftime('%Y%m%d_%H%M')}"
         ],
         properties={
