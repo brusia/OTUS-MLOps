@@ -1,11 +1,6 @@
-# OTUS-MLOps
+# Задание 8
 
-Данный репозиторий создан для выполнения домашних заданий по курсу MLOps платформы обучения OTUS.
-
-<!-- Start of Hometask 8 block -->
-## Задание 8
-
-### Общие положения
+## Общие положения
 
 В рамках выполнений задания 8 был развёрнут сервис kafka (обновлён docker-compose, разворачиваемый на отдельной виртуальной машине при создании облачного ресурса из terraform), реализован скрипт записи в очередь transactions -- src/otus_mlops/kafka/producer.py.
 
@@ -15,29 +10,6 @@
 
 В связи с повышенной нагрузкой в праздничное время имеет смысл рассмотреть (и реализовать в рамках следующего задания) возможность разворачивания нескольких instance-ов модели для равномерного распределения заявок на нескольких экземпляров сервиса.
 
-### Примечания
+## Примечания
 
 - Без примечаний.
-
-<!-- End of Hometask 8 block. -->
-
-## Oбщие положения
-
-Для экономии места выполненные (и принятые) задания перемещены из главного файла README.md текущего репозитория и скрыты в соответствующих каталогах (docs/hometasks/<task_number>/hometask<task_number>.md)
-
-Актуальное задание (для проверки) будет размещено в текущей версии README.md
-Список предыдущих заданий
-
-- [Hometask 1](docs/hometasks//01/hometask1.md)
-- [Hometask 2](docs/hometasks/02/hometask2.md)
-- [Hometask 3](docs/hometasks/03/hometask3.md)
-- [Hometask 4](docs/hometasks/04/hometask04.md)
-- [Hometask 5](docs/hometasks/05/hometask5.md)
-- [Hometask 6](docs/hometasks/06/hometask06.md)
-- [Hometask 7](docs/hometasks/07/hometask07.md)
-- [Hometask 8](docs/hometasks/08/hometask08.md)
-- [Hometask 9](docs/hometasks/09/hometask09.md)
-
-Статусы задач поддерживаются в актуальном состоянии на протяжении всей работы. Kandan-доска доступна по ссылке:
-
-[Tasks View](https://github.com/users/brusia/projects/1/views/1)

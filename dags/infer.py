@@ -1,5 +1,5 @@
 """
-DAG: data_pipeline
+DAG: inference
 Description: DAG for processing data with Dataproc and PySpark.
 """
 from typing import Union, Final
@@ -41,10 +41,14 @@ DP_SECURITY_GROUP_ID = Variable.get("DP_SECURITY_GROUP_ID")
 INPUT_DATA_DIR: Final[str] = "data/raw"
 
 MLFLOW_TRACKING_URI = Variable.get("MLFLOW_TRACKING_URI")
-MLFLOW_TRAIN_EXPERIMENT_NAME = "mlflow-experiment-train"
-MLFLOW_OPT_EXPERIMENT_NAME = "mlflow-experiment-opt"
+MLFLOW_INFER_EXPERIMENT_NAME = "mlflow-experiment-infer"
 
-S3_INPUT_DATA_BUCKET = f"s3a://{S3_BUCKET_NAME}/test/input_data"
+
+KAFKA_BOOTSTRAP_SERVER_URI = Variable.get("KAFKA_BOOTSTRAP_SERVER_URI")
+KAFKA_BOOTSTRAP_SERVER_PORT = Variable.get("KAFKA_BOOTSTRAP_SERVER_PORT")
+
+KAFKA_BOOTSTRAP_URI=f"{KAFKA_BOOTSTRAP_SERVER_URI}:{KAFKA_BOOTSTRAP_SERVER_PORT}"
+# S3_INPUT_DATA_BUCKET = f"s3a://{S3_BUCKET_NAME}/test/input_data"
 S3_SRC_BUCKET = f"s3a://{S3_BUCKET_NAME}/src"
 S3_DP_LOGS_BUCKET = f"s3a://{S3_BUCKET_NAME}/test/logs/airflow_logs/"
 S3_VENV_ARCHIVE = f"s3a://{S3_BUCKET_NAME}/src/venvs/venv.tar.gz"
@@ -67,7 +71,7 @@ def get_cluster_id_from_xcom(**kwargs):
 
 
 with DAG(
-    dag_id="testing-train-model",
+    dag_id="inference-with-kafka",
     start_date=datetime(year=2025, month=8, day=3),
     # schedule=timedelta(days=1),
     catchup=False
@@ -78,12 +82,12 @@ with DAG(
         trigger_rule=TriggerRule.ONE_FAILED
     )
 
-    cluster_name = "tmp-spark"
+    cluster_name = "infer-spark"
     create_spark_cluster = DataprocCreateClusterOperator(
         task_id="create_cluster",
         folder_id=YC_FOLDER_ID,
         cluster_name=cluster_name,
-        cluster_description="Temp Spark Cluster",
+        cluster_description="Temp Spark Cluster fo Inference",
         subnet_id=YC_SUBNET_ID,
         s3_bucket=S3_DP_LOGS_BUCKET,
         service_account_id=DP_SA_ID,
@@ -109,72 +113,26 @@ with DAG(
         services=["YARN", "SPARK", "HDFS", "MAPREDUCE"],
     )
 
-
     get_cluster_info = PythonOperator(
         task_id='get_cluster_info',
         python_callable=get_cluster_id_from_xcom,
         trigger_rule=TriggerRule.ALL_DONE
     )
 
-    train_model = DataprocCreatePysparkJobOperator(
-        task_id="train-model-spark-task",
-        cluster_id="{{ ti.xcom_pull(task_ids='get_cluster_info') }}",
-        main_python_file_uri=f"s3a://{S3_BUCKET_NAME}/src/model_train.py",
-
-        args=[
-            "--tracking-uri", MLFLOW_TRACKING_URI,
-            "--experiment-name", MLFLOW_TRAIN_EXPERIMENT_NAME,
-            "--auto-register",
-            "--s3-endpoint-url", S3_ENDPOINT_URL,
-            "--s3-access-key", S3_ACCESS_KEY,
-            "--s3-secret-key", S3_SECRET_KEY,
-            "--run-name", f"training_{datetime.now().strftime('%Y%m%d_%H%M')}"
-        ],
-        properties={
-            'spark.submit.deployMode': 'cluster',
-            'spark.yarn.dist.archives': f'{S3_VENV_ARCHIVE}#.venv',
-            'spark.yarn.appMasterEnv.PYSPARK_PYTHON': './.venv/bin/python3',
-            'spark.yarn.appMasterEnv.PYSPARK_DRIVER_PYTHON': './.venv/bin/python3',
-        },
-
-        trigger_rule=TriggerRule.ALL_DONE
-    )
-
-    optimize_params = DataprocCreatePysparkJobOperator(
-        task_id="optimize-params-spark-task",
-        cluster_id="{{ ti.xcom_pull(task_ids='get_cluster_info') }}",
-        main_python_file_uri=f"s3a://{S3_BUCKET_NAME}/src/ab_test.py",
-
-        args=[
-            "--tracking-uri", MLFLOW_TRACKING_URI,
-            "--experiment-name", MLFLOW_OPT_EXPERIMENT_NAME,
-            "--s3-endpoint-url", S3_ENDPOINT_URL,
-            "--s3-access-key", S3_ACCESS_KEY,
-            "--s3-secret-key", S3_SECRET_KEY,
-            "--run-name", f"optimize_{datetime.now().strftime('%Y%m%d_%H%M')}"
-        ],
-        properties={
-            'spark.submit.deployMode': 'cluster',
-            'spark.yarn.dist.archives': f'{S3_VENV_ARCHIVE}#.venv',
-            'spark.yarn.appMasterEnv.PYSPARK_PYTHON': './.venv/bin/python3',
-            'spark.yarn.appMasterEnv.PYSPARK_DRIVER_PYTHON': './.venv/bin/python3',
-        },
-
-        trigger_rule=TriggerRule.ALL_DONE
-    )
-
     infer_data = DataprocCreatePysparkJobOperator(
-        task_id="optimize-params-spark-task",
+        task_id="infer-with-kafka-spark-task",
         cluster_id="{{ ti.xcom_pull(task_ids='get_cluster_info') }}",
-        main_python_file_uri=f"s3a://{S3_BUCKET_NAME}/src/ab_test.py",
+        main_python_file_uri=f"s3a://{S3_BUCKET_NAME}/src/infer_using_kafka.py",
 
         args=[
             "--tracking-uri", MLFLOW_TRACKING_URI,
-            "--experiment-name", MLFLOW_OPT_EXPERIMENT_NAME,
+            "--experiment-name", MLFLOW_INFER_EXPERIMENT_NAME,
             "--s3-endpoint-url", S3_ENDPOINT_URL,
             "--s3-access-key", S3_ACCESS_KEY,
             "--s3-secret-key", S3_SECRET_KEY,
-            "--run-name", f"optimize_{datetime.now().strftime('%Y%m%d_%H%M')}"
+            "-n", 5000,
+            "--bootstrap-server", KAFKA_BOOTSTRAP_URI,
+            "--run-name", f"inference_{datetime.now().strftime('%Y%m%d_%H%M')}"
         ],
         properties={
             'spark.submit.deployMode': 'cluster',
@@ -192,4 +150,4 @@ with DAG(
         trigger_rule=TriggerRule.ALL_DONE,
     )
 
-    create_spark_cluster >> get_cluster_info >> train_model >> optimize_params >> delete_spark_cluster >> delete_cluster_using_bash
+    create_spark_cluster >> get_cluster_info >> infer_data >> delete_spark_cluster >> delete_cluster_using_bash
