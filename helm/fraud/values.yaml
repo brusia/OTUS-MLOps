@@ -4,3 +4,8 @@ image:
 aws:
   access: "$AWS_ACCESS_KEY_ID"
   secret: "$AWS_SECRET_ACCESS_KEY"
+autoscaling:
+  minReplicas: 4
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 80
+name: fraud

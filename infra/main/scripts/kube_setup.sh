@@ -26,3 +26,12 @@ helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 helm repo update
 
 helm upgrade --install fraud helm/fraud --namespace fraud --set aws.access=${access_key} --set aws.secret=${secret_key}
+
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+kubectl create ns monitoring
+
+helm install kps prometheus-community/kube-prometheus-stack --namespace monitoring --set grafana.adminPassword='admin' --set prometheus.prometheusSpec.scrapeInterval='15s'
+
+kubectl -n monitoring port-forward svc/kps-grafana 3000:80
+kubectl -n monitoring port-forward svc/kps-kube-prometheus-stack-prometheus 9090:9090
