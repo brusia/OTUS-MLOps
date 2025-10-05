@@ -9,6 +9,8 @@ from typing import Any, Dict
 
 from fastapi import FastAPI, HTTPException
 import numpy as np
+from prometheus_client import Counter, Histogram
+from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic import BaseModel
 import pandas as pd
 import logging
@@ -64,6 +66,21 @@ _logger.info("Model loaded")
 
 
 app = FastAPI()
+Instrumentator().instrument(app).expose(app, include_in_schema=False)
+
+REQUESTS = Counter("prediction_requests_total", "Total prediction requests")
+ERRORS = Counter("prediction_errors_total", "Total 5xx injected errors")
+BINARY_MODEL_SCORES = Histogram(
+    "binary_model_prediction_latency_seconds",
+    "Latency of /predict handler",
+    buckets=(0.01, 0.1, 0.05, 1, 1.5, 2, 3, 4, 5)
+)
+
+MULTICLASS_MODEL_SCORES = Histogram(
+    "multiclass_prediction_latency_seconds",
+    "Latency of /predict_scenario handler",
+    buckets=(0.01, 0.1, 0.05, 1, 1.5, 2, 3, 4, 5)
+)
 
 class FraudFeatures(BaseModel):
     """Fraud features"""
@@ -77,6 +94,7 @@ class FraudFeatures(BaseModel):
 
 def make_prediction(features: FraudFeatures, prediction_type: PredictionType = PredictionType.Binary, output_value_dict: dict[int, str] = {0: "simple_transaction", 1: "FRAUD"}) -> Dict[str, Any]:
     _logger.info(f"Making prediction for: {features}")
+    REQUESTS.inc()
     try:
         data = pd.DataFrame([features.model_dump()])
         model = binary_model if prediction_type == PredictionType.Binary else multiclass_model
@@ -97,6 +115,7 @@ def make_prediction(features: FraudFeatures, prediction_type: PredictionType = P
         pred_class = output_value_dict[predicted_class]
     except Exception as e:
         _logger.error(f"Prediction error: {e}")
+        ERRORS.inc()
         raise HTTPException(
             status_code=500, 
             detail="An error occurred during prediction"
@@ -111,6 +130,7 @@ def health_check() -> dict:
 
 
 @app.post("/predict")
+@BINARY_MODEL_SCORES.time()
 def predict_fraud(features: FraudFeatures) -> Dict[str, Any]:
     """Make a prediction by model"""
 
@@ -119,6 +139,7 @@ def predict_fraud(features: FraudFeatures) -> Dict[str, Any]:
 
 
 @app.post("/predict_scenario")
+@MULTICLASS_MODEL_SCORES.time()
 def prediction_fraud_scenario(features: FraudFeatures) -> Dict[str, Any]:
     """Make a prediction for multiclasses"""
 
