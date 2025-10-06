@@ -1,0 +1,14 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: fraud-monitor
+  labels:
+    release: kps
+spec:
+  selector:
+    matchLabels:
+      app: fraud
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 5s

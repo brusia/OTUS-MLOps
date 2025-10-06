@@ -31,3 +31,10 @@ spec:
                 name: fraud
                 port:
                   number: 80
+          - path: /metrics
+            pathType: Prefix
+            backend:
+              service:
+                name: fraud
+                port:
+                  number: 80
