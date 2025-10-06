@@ -73,13 +73,13 @@ ERRORS = Counter("prediction_errors_total", "Total 5xx injected errors")
 BINARY_MODEL_SCORES = Histogram(
     "binary_model_prediction_latency_seconds",
     "Latency of /predict handler",
-    buckets=(0.01, 0.1, 0.05, 1, 1.5, 2, 3, 4, 5)
+    buckets=(0.01, 0.05, 0.1, 1, 1.5, 2, 3, 4, 5)
 )
 
 MULTICLASS_MODEL_SCORES = Histogram(
     "multiclass_prediction_latency_seconds",
     "Latency of /predict_scenario handler",
-    buckets=(0.01, 0.1, 0.05, 1, 1.5, 2, 3, 4, 5)
+    buckets=(0.01, 0.05, 0.1, 1, 1.5, 2, 3, 4, 5)
 )
 
 class FraudFeatures(BaseModel):
