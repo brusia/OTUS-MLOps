@@ -15,4 +15,5 @@ module "managing_proxy" {
    virtual_machine = var.virtual_machine
    storage_secrets = { access_key = module.storage.service_account_access_key, secret_key = module.storage.service_account_private_key }
    network_settings = var.network_settings
+   kafka = var.kafka
 }

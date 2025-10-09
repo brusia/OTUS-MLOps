@@ -1,0 +1,11 @@
+dags:
+  gitSync:
+    enabled: true
+    repo: https://github.com/brusia/OTUS-MLOps.git
+    branch: hometask_10
+    depth: 1
+    wait: 60
+    subPath: "dags"
+
+  persistence:
+    enabled: false
