@@ -1,0 +1,27 @@
+**Firing**
+
+Value: [no value]
+Labels:
+ - alertname = DatasourceNoData
+ - datasource_uid = prometheus
+ - grafana_folder = fraud-folder
+ - ref_id = B,C
+ - rulename = High performance alert
+Annotations:
+Source: http://localhost:3000/alerting/grafana/cf051pfp0jqbke/view?orgId=1
+Silence: http://localhost:3000/alerting/silence/new?alertmanager=grafana&matcher=__alert_rule_uid__%3Dcf051pfp0jqbke&matcher=datasource_uid%3Dprometheus&matcher=ref_id%3DB%2CC&matcher=rulename%3DHigh+performance+alert&orgId=1
+
+
+**Resolved**
+
+Value: [no value]
+Labels:
+ - alertname = DatasourceNoData
+ - datasource_uid = prometheus
+ - grafana_folder = fraud-folder
+ - ref_id = A,B,C
+ - rulename = High performance alert
+Annotations:
+ - grafana_state_reason = MissingSeries
+Source: http://localhost:3000/alerting/grafana/cf051pfp0jqbke/view?orgId=1
+Silence: http://localhost:3000/alerting/silence/new?alertmanager=grafana&matcher=__alert_rule_uid__%3Dcf051pfp0jqbke&matcher=datasource_uid%3Dprometheus&matcher=ref_id%3DA%2CB%2CC&matcher=rulename%3DHigh+performance+alert&orgId=1
