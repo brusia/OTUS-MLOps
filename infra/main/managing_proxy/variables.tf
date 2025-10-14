@@ -55,3 +55,9 @@ variable "network_settings" {
         service_account_name = string
     })
 }
+
+variable "kafka" {
+  type = object({
+    topic_name = string
+  })
+}

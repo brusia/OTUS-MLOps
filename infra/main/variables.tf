@@ -94,3 +94,9 @@ variable "git" {
     token = string
   })
 }
+
+variable "kafka" {
+  type = object({
+    topic_name = string
+  })
+}

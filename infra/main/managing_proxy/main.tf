@@ -69,6 +69,8 @@ resource "yandex_compute_instance" "proxy" {
       s3_bucket                   = var.bucket_name
       docker_compose_content = file("${path.root}/../src/docker-compose.yaml")
       user_name                   = var.virtual_machine.user_name
+      kafka_broker                = "{yandex_compute_instance.proxy.network_interface.0.ip_address}:9092"
+      topic_name                  = var.kafka.topic_name
       # user_name = "ubuntu"
       # git_user                    = var.git_user
     #   git_repo                    = var.git.repo

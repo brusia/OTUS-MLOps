@@ -7,7 +7,6 @@ from otus_mlops.internals.interfaces.base import AnalyserInputData, DataFrame
 
 
 class IDataPreprocessor(ABC, Generic[AnalyserInputData, DataFrame]):
-# class IDataPreprocessor(ABC):
     def __init__(self):
         super().__init__()
 

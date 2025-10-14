@@ -1,6 +1,11 @@
 image:
   repository: "brusia/fastapi-fraud"
-  tag: "6b306d622f48b48f7514ca48d4f01999cd2e881f"
+  tag: "0ba067d87528a47be5d5c5e6f8a2e89bedd54a2c"
 aws:
   access: "$AWS_ACCESS_KEY_ID"
   secret: "$AWS_SECRET_ACCESS_KEY"
+autoscaling:
+  minReplicas: 4
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 80
+name: fraud
